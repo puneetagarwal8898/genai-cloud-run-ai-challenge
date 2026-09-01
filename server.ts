@@ -79,6 +79,24 @@ app.get("/api/config", (req, res) => {
   });
 });
 
+// Dynamic client-side Firebase bootstrap script
+// Provides seamless runtime resolution in both development (Vite) and Cloud Run production
+app.get("/api/firebase-config.js", (req, res) => {
+  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || "";
+  const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "";
+  const clientConfig = {
+    apiKey: firebaseApiKey,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : ""),
+    projectId: firebaseProjectId,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : ""),
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+    appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || ""
+  };
+  res.setHeader("Content-Type", "application/javascript");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.send(`window.__FIREBASE_CONFIG__ = ${JSON.stringify(clientConfig)};`);
+});
+
 // Real email dispatch endpoint for 6-digit verification code
 app.post("/api/auth/send-verification-code", async (req, res) => {
   try {

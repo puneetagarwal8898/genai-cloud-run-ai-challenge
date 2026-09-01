@@ -18,6 +18,8 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
 }) => {
   if (!isOpen || !provider) return null;
 
+  const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'your-app-domain.run.app';
+
   const getProviderDetails = () => {
     switch (provider) {
       case 'google':
@@ -27,20 +29,24 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
           steps: [
             {
               step: '1. Open Firebase Console',
-              desc: 'Go to the Firebase Console (console.firebase.google.com) and open your project.',
+              desc: 'Go to the Firebase Console (console.firebase.google.com) and select your Firebase project.',
               link: 'https://console.firebase.google.com'
             },
             {
-              step: '2. Enable Google Sign-In',
-              desc: 'Navigate to Build > Authentication > Sign-in method tab. Click "Add new provider", select "Google", and toggle "Enable". Set your support email.'
+              step: '2. Enable Google Sign-In Provider',
+              desc: 'Navigate to Build > Authentication > Sign-in method. Click "Add new provider" (or select Google), toggle "Enable", select your Project support email, and click "Save".'
             },
             {
-              step: '3. Authorize Production Domain',
-              desc: 'Under Authentication > Settings > Authorized domains, add your Cloud Run or production domain.'
+              step: '3. Authorize This Domain in Firebase',
+              desc: `Go to Authentication > Settings > Authorized domains. Click "Add domain" and add your current application domain: ${currentHost}`
             },
             {
-              step: '4. Set API Keys in Environment',
-              desc: 'Ensure VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, and VITE_FIREBASE_PROJECT_ID are configured in your project settings / environment variables.'
+              step: '4. Get Firebase Web API Key & Project ID',
+              desc: 'Go to Project Settings (gear icon) > General. Under "Your apps", register a Web app (or view your existing web app) and copy the Web API Key (starts with AIzaSy...) and Project ID.'
+            },
+            {
+              step: '5. Configure Secrets & Verify API Restrictions',
+              desc: 'In AI Studio Settings > Secrets (or Cloud Run environment variables), configure FIREBASE_API_KEY (or VITE_FIREBASE_API_KEY) and FIREBASE_PROJECT_ID. If your API key has Google Cloud API restrictions, ensure "Identity Toolkit API" and "Token Service API" are allowed.'
             }
           ]
         };
