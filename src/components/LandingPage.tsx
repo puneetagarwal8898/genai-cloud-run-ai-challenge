@@ -207,9 +207,13 @@ export const LandingPage: React.FC = () => {
       else if (provider === 'linkedin') await signInWithLinkedIn(isTestMode);
     } catch (err: any) {
       console.warn(`${provider} login notice:`, err.message);
-      // Open the interactive guide modal to help configure or test
-      setGuideProvider(provider);
-      setIsGuideOpen(true);
+      // Only pop open the guide modal if credentials are not configured at all
+      if (err.message && err.message.includes('Firebase credentials missing')) {
+        setGuideProvider(provider);
+        setIsGuideOpen(true);
+      } else {
+        setLocalError(err.message || `Failed to sign in with ${provider}.`);
+      }
     } finally {
       setIsProcessing(false);
     }

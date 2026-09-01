@@ -469,7 +469,8 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    // Do not let express.static serve index.html directly; our app.get("*") handles index.html with runtime config injection
+    app.use(express.static(distPath, { index: false }));
     app.get("*", (req, res) => {
       const indexPath = path.join(distPath, "index.html");
       const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || "";

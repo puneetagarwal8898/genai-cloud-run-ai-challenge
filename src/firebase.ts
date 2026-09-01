@@ -16,45 +16,68 @@ declare global {
   }
 }
 
-// Resolve configuration from runtime server injection or build-time environment variables
-const runtimeConfig = typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__ : undefined;
-
-const firebaseApiKey = runtimeConfig?.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "";
-const firebaseProjectId = runtimeConfig?.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
-
-export const isFirebaseConfigured = Boolean(
-  firebaseApiKey && 
-  firebaseApiKey !== "UNCONFIGURED_FIREBASE_API_KEY" && 
-  firebaseProjectId && 
-  firebaseProjectId !== "unconfigured-project"
-);
-
-export function getFirebaseCredentialsStatus() {
-  const currentKey = (typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__?.apiKey : undefined) || import.meta.env.VITE_FIREBASE_API_KEY || "";
-  const currentProject = (typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__?.projectId : undefined) || import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
-  const isValid = Boolean(currentKey && currentKey !== "UNCONFIGURED_FIREBASE_API_KEY" && currentProject && currentProject !== "unconfigured-project");
+// Resolve configuration dynamically to guarantee correct runtime binding
+export function getResolvedFirebaseConfig() {
+  const runtime = typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__ : undefined;
+  const apiKey = runtime?.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "";
+  const projectId = runtime?.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
   
   return {
-    isConfigured: isValid,
-    hasApiKey: Boolean(currentKey && currentKey !== "UNCONFIGURED_FIREBASE_API_KEY"),
-    hasProjectId: Boolean(currentProject && currentProject !== "unconfigured-project"),
-    apiKey: currentKey,
-    projectId: currentProject
+    apiKey: apiKey || "UNCONFIGURED_FIREBASE_API_KEY",
+    authDomain: runtime?.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (projectId ? `${projectId}.firebaseapp.com` : "unconfigured.firebaseapp.com"),
+    projectId: projectId || "unconfigured-project",
+    storageBucket: runtime?.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (projectId ? `${projectId}.appspot.com` : "unconfigured.appspot.com"),
+    messagingSenderId: runtime?.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+    appId: runtime?.appId || import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:0000000000000000000000"
   };
 }
 
-const firebaseConfig = {
-  apiKey: firebaseApiKey || "UNCONFIGURED_FIREBASE_API_KEY",
-  authDomain: runtimeConfig?.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : "unconfigured.firebaseapp.com"),
-  projectId: firebaseProjectId || "unconfigured-project",
-  storageBucket: runtimeConfig?.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : "unconfigured.appspot.com"),
-  messagingSenderId: runtimeConfig?.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
-  appId: runtimeConfig?.appId || import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:0000000000000000000000"
-};
+export function getFirebaseCredentialsStatus() {
+  const config = getResolvedFirebaseConfig();
+  const isValid = Boolean(
+    config.apiKey && 
+    config.apiKey !== "UNCONFIGURED_FIREBASE_API_KEY" && 
+    config.projectId && 
+    config.projectId !== "unconfigured-project"
+  );
+  
+  return {
+    isConfigured: isValid,
+    hasApiKey: Boolean(config.apiKey && config.apiKey !== "UNCONFIGURED_FIREBASE_API_KEY"),
+    hasProjectId: Boolean(config.projectId && config.projectId !== "unconfigured-project"),
+    apiKey: config.apiKey,
+    projectId: config.projectId,
+    authDomain: config.authDomain
+  };
+}
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const isFirebaseConfigured = getFirebaseCredentialsStatus().isConfigured;
 
+function initOrGetApp() {
+  const config = getResolvedFirebaseConfig();
+  const apps = getApps();
+  if (apps.length > 0) {
+    const existing = apps[0];
+    // If existing app was initialized with unconfigured dummy key but runtime now has the real key, re-init
+    if (existing.options.apiKey === "UNCONFIGURED_FIREBASE_API_KEY" && config.apiKey !== "UNCONFIGURED_FIREBASE_API_KEY") {
+      try {
+        return initializeApp(config, 'reflectai-active');
+      } catch (e) {
+        return existing;
+      }
+    }
+    return existing;
+  }
+  return initializeApp(config);
+}
+
+export const app = initOrGetApp();
 export const auth = getAuth(app);
+
+export function getActiveAuth() {
+  const activeApp = initOrGetApp();
+  return getAuth(activeApp);
+}
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
