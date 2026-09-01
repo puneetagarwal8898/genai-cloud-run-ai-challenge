@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public or private profile metadata for an authenticated user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastActiveAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "JournalInteraction": {
+      "title": "JournalInteraction",
+      "description": "Multi-turn user journal reflection entry and Gemini assistant response pair",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "prompt": { "type": "string" },
+        "geminiResponse": { "type": "string" },
+        "summary": { "type": "string" },
+        "tags": { "type": "array" },
+        "mode": { "type": "string", "enum": ["reflection", "brainstorm", "summary", "advice"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "prompt", "geminiResponse", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profile and account preferences"
+    },
+    "/users/{userId}/interactions/{interactionId}": {
+      "schema": "JournalInteraction",
+      "description": "Stores individual journal entries, reflections, and Gemini responses strictly isolated by userId"
+    }
+  }
+}
