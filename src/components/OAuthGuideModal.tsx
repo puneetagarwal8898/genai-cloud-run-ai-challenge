@@ -65,13 +65,12 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
               desc: 'In your LinkedIn app under the "Products" tab, find "Sign In with LinkedIn using OpenID Connect" and click "Request Access". It is granted instantly.'
             },
             {
-              step: '3. Add Authorized Redirect URL in LinkedIn',
-              desc: 'Go to the "Auth" tab in your LinkedIn app. Under "OAuth 2.0 settings" > "Authorized redirect URLs for your app", add: https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler'
+              step: '3. Add Authorized Redirect URLs in LinkedIn',
+              desc: `Go to the "Auth" tab in your LinkedIn app. Under "OAuth 2.0 settings" > "Authorized redirect URLs for your app", add both:\n1) https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler\n2) https://${currentHost}/api/auth/linkedin/callback`
             },
             {
-              step: '4. Enable LinkedIn in Firebase Authentication',
-              desc: 'In Firebase Console (console.firebase.google.com) > your project (genai-cohort3-ideathon) > Authentication > Sign-in method, click "Add new provider" > OpenID Connect (or LinkedIn), paste your LinkedIn Client ID and Client Secret from the "Auth" tab, and click Save.',
-              link: 'https://console.firebase.google.com/project/genai-cohort3-ideathon/authentication/providers'
+              step: '4. Direct Backend Token Exchange (Recommended for Cloud Run)',
+              desc: 'Due to a known upstream issue where Firebase Identity Platform sends the client secret via HTTP Basic headers rather than POST form parameters, set LINKEDIN_CLIENT_SECRET on your Cloud Run service to enable flawless direct backend authentication.'
             }
           ]
         };

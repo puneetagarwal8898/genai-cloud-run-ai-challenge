@@ -345,12 +345,32 @@ export const LandingPage: React.FC = () => {
         />
 
         {displayError && (
-          <div className="mb-6 p-3.5 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-xs sm:text-sm flex items-start justify-between backdrop-blur-xs max-w-md mx-auto w-full">
+          <div className="mb-6 p-3.5 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-start justify-between backdrop-blur-xs max-w-md mx-auto w-full gap-2">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-red-300">Notice</p>
-                <p className="mt-0.5 text-red-200/90 leading-relaxed">{displayError}</p>
+                <p className="mt-0.5 text-red-200/90 leading-relaxed text-xs">{displayError}</p>
+                {displayError.includes('LinkedIn') && (
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      id="error-continue-google-btn"
+                      onClick={() => handleOAuthSignIn('google')}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-medium text-white transition cursor-pointer"
+                    >
+                      Sign In with Google Instead
+                    </button>
+                    <button
+                      type="button"
+                      id="error-linkedin-demo-btn"
+                      onClick={() => signInWithLinkedIn(true)}
+                      className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-[11px] font-medium text-blue-200 transition cursor-pointer"
+                    >
+                      Test with LinkedIn Profile
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <button
@@ -358,7 +378,7 @@ export const LandingPage: React.FC = () => {
                 setLocalError(null);
                 clearError();
               }}
-              className="text-xs font-semibold underline text-red-300 ml-3 shrink-0 cursor-pointer"
+              className="text-xs font-semibold underline text-red-300 ml-auto sm:ml-3 shrink-0 cursor-pointer"
             >
               Dismiss
             </button>
