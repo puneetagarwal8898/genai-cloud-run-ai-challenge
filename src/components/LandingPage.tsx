@@ -351,7 +351,7 @@ export const LandingPage: React.FC = () => {
               <div>
                 <p className="font-semibold text-red-300">Notice</p>
                 <p className="mt-0.5 text-red-200/90 leading-relaxed text-xs">{displayError}</p>
-                {displayError.includes('LinkedIn') && (
+                {(displayError.includes('LinkedIn') || displayError.includes('Facebook') || displayError.includes('Meta')) && (
                   <div className="mt-2.5 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -361,25 +361,52 @@ export const LandingPage: React.FC = () => {
                     >
                       Sign In with Google Instead
                     </button>
-                    <button
-                      type="button"
-                      id="error-linkedin-demo-btn"
-                      onClick={() => signInWithLinkedIn(true)}
-                      className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-[11px] font-medium text-blue-200 transition cursor-pointer"
-                    >
-                      Test with LinkedIn Profile
-                    </button>
-                    <button
-                      type="button"
-                      id="error-linkedin-guide-btn"
-                      onClick={() => {
-                        setGuideProvider('linkedin');
-                        setIsGuideOpen(true);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-[11px] font-medium text-indigo-200 transition cursor-pointer"
-                    >
-                      View Fix &amp; Guide
-                    </button>
+                    {displayError.includes('LinkedIn') && (
+                      <>
+                        <button
+                          type="button"
+                          id="error-linkedin-demo-btn"
+                          onClick={() => signInWithLinkedIn(true)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-[11px] font-medium text-blue-200 transition cursor-pointer"
+                        >
+                          Test with LinkedIn Profile
+                        </button>
+                        <button
+                          type="button"
+                          id="error-linkedin-guide-btn"
+                          onClick={() => {
+                            setGuideProvider('linkedin');
+                            setIsGuideOpen(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-[11px] font-medium text-indigo-200 transition cursor-pointer"
+                        >
+                          View Fix &amp; Guide
+                        </button>
+                      </>
+                    )}
+                    {(displayError.includes('Facebook') || displayError.includes('Meta')) && (
+                      <>
+                        <button
+                          type="button"
+                          id="error-facebook-demo-btn"
+                          onClick={() => signInWithFacebook(true)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-600/25 hover:bg-blue-600/35 text-[11px] font-medium text-blue-200 transition cursor-pointer"
+                        >
+                          Test with Facebook Profile
+                        </button>
+                        <button
+                          type="button"
+                          id="error-facebook-guide-btn"
+                          onClick={() => {
+                            setGuideProvider('facebook');
+                            setIsGuideOpen(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-[11px] font-medium text-indigo-200 transition cursor-pointer"
+                        >
+                          View Facebook Guide
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

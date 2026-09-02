@@ -81,20 +81,25 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
           steps: [
             {
               step: '1. Create App on Meta for Developers',
-              desc: 'Navigate to Meta for Developers (developers.facebook.com) and click "Create App" (type: Consumer or Business).',
+              desc: 'Go to Meta for Developers (developers.facebook.com/apps), click "Create App", select use case "Authenticate and request data from users with Facebook Login" (or App Type "Consumer"), and name it "ReflectAI".',
               link: 'https://developers.facebook.com/apps'
             },
             {
-              step: '2. Add Facebook Login Product',
-              desc: 'Select "Add Product" and set up "Facebook Login for Web".'
+              step: '2. Add Valid OAuth Redirect URIs in Facebook Login',
+              desc: 'In your Meta app dashboard under Facebook Login > Settings, ensure "Client OAuth Login" and "Web OAuth Login" are enabled (YES). Add Valid OAuth Redirect URI: https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler and https://reflectai-952579076488.asia-south1.run.app/api/auth/facebook/callback, then click Save.'
             },
             {
-              step: '3. Configure Valid OAuth Redirect URIs',
-              desc: 'In Firebase Console > Authentication > Sign-in method > Facebook, copy the OAuth redirect URI and paste it into Facebook Login > Settings > Valid OAuth Redirect URIs.'
+              step: '3. Copy App ID & App Secret from Basic Settings',
+              desc: 'In Meta for Developers, navigate to App settings > Basic. Copy the numeric "App ID" and click "Show" to copy the "App Secret". (Also set Privacy Policy URL to your app URL).'
             },
             {
-              step: '4. Enter App ID and App Secret into Firebase',
-              desc: 'From Facebook App Settings > Basic, copy the App ID and App Secret, then paste them into Firebase Authentication.'
+              step: '4. Enable Facebook in Firebase Console (Native)',
+              desc: 'Open Firebase Console > Authentication > Sign-in method, click Facebook, toggle Enable, paste your Meta App ID and App Secret into Firebase, then click Save.',
+              link: 'https://console.firebase.google.com/project/genai-cohort3-ideathon/authentication/providers'
+            },
+            {
+              step: '5. Optional: Direct Cloud Run Secret Setting',
+              desc: 'Alternatively, you can provide FACEBOOK_APP_ID and FACEBOOK_APP_SECRET as Cloud Run environment variables for direct server-side token exchange.'
             }
           ]
         };

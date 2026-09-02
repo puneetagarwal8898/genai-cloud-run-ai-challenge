@@ -396,10 +396,42 @@ firebase deploy --only firestore:rules
 5. Copy your LinkedIn **Client ID** and **Client Secret** into Firebase.
 
 ### 3. Meta / Facebook Login
-1. Open [Meta for Developers](https://developers.facebook.com/apps) and create an app.
-2. Add the **Facebook Login for Web** product.
-3. In Firebase Console &rarr; **Facebook**, copy the OAuth redirect URL and paste it under **Valid OAuth Redirect URIs** in Meta Console.
-4. Copy your **App ID** and **App Secret** into Firebase.
+
+ReflectAI supports both **Native Firebase Authentication** (recommended) and **Direct Cloud Run OAuth Exchange** for Facebook Sign-In.
+
+#### Option A: Native Firebase Authentication (Recommended)
+1. Open [Meta for Developers](https://developers.facebook.com/apps) and click **Create App**.
+2. Select use case **"Authenticate and request data from users with Facebook Login"** (or App Type **Consumer** / **None**), then click **Next**.
+3. Name your app (e.g., `ReflectAI`) and enter your contact email.
+4. Under **Facebook Login** &rarr; **Settings**:
+   - Ensure **Client OAuth Login** and **Web OAuth Login** are toggled **Yes**.
+   - Under **Valid OAuth Redirect URIs**, paste:
+     ```text
+     https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler
+     ```
+   - Click **Save Changes**.
+5. In the left menu, navigate to **App settings** &rarr; **Basic**:
+   - Copy the numeric **App ID**.
+   - Click **Show** to copy the **App Secret** (enter your Meta account password if prompted).
+   - In **Privacy Policy URL**, paste your deployed URL (`https://reflectai-952579076488.asia-south1.run.app`).
+6. Open [Firebase Console &rarr; Authentication &rarr; Sign-in method](https://console.firebase.google.com/project/genai-cohort3-ideathon/authentication/providers):
+   - Under **Additional providers**, click **Facebook**.
+   - Toggle **Enable**.
+   - Paste the **App ID** and **App Secret** from Meta.
+   - Click **Save**.
+
+#### Option B: Direct Cloud Run OAuth 2.0 Exchange
+If you prefer managing secrets via Cloud Run environment variables (similar to LinkedIn):
+1. In Meta for Developers &rarr; **Facebook Login** &rarr; **Settings**, add the backend callback URL:
+   ```text
+   https://reflectai-952579076488.asia-south1.run.app/api/auth/facebook/callback
+   ```
+2. Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` on Cloud Run:
+   ```bash
+   gcloud run services update reflectai \
+     --update-env-vars FACEBOOK_APP_ID="YOUR_META_APP_ID",FACEBOOK_APP_SECRET="YOUR_META_APP_SECRET" \
+     --region=asia-south1
+   ```
 
 ---
 
