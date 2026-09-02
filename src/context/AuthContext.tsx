@@ -249,7 +249,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithLinkedIn = async (isTestEnv = false) => {
     setError(null);
     try {
-      const result = await signInWithPopup(auth, linkedInProvider);
+      const creds = getFirebaseCredentialsStatus();
+      if (!creds.isConfigured && !isTestEnv) {
+        throw new Error(`Firebase credentials missing: FIREBASE_API_KEY / FIREBASE_PROJECT_ID`);
+      }
+
+      const activeAuth = getActiveAuth();
+      const result = await signInWithPopup(activeAuth, linkedInProvider);
       const loggedUser = result.user;
       const profile: UserProfile = {
         uid: loggedUser.uid,
@@ -263,7 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       saveActiveSession(profile);
     } catch (err: any) {
-      console.warn("LinkedIn Sign-In notice:", err.message);
+      console.warn("LinkedIn Sign-In notice:", err.message, err.code);
       if (isTestEnv) {
         const fallbackProfile: UserProfile = {
           uid: 'linkedin_user_' + Math.random().toString(36).substring(2, 9),
@@ -277,7 +283,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         saveActiveSession(fallbackProfile);
       } else {
-        const msg = 'LinkedIn Sign-In requires an OAuth 2.0 Client registered in LinkedIn Developer Portal and linked in Firebase Console.';
+        let msg = 'LinkedIn Sign-In requires an OAuth 2.0 Client registered in LinkedIn Developer Portal and linked in Firebase Console.';
+        if (err.code === 'auth/popup-closed-by-user') {
+          msg = 'LinkedIn Sign-In popup was closed before completing authentication.';
+        } else if (err.code === 'auth/cancelled-popup-request') {
+          msg = 'LinkedIn Sign-In popup request was cancelled.';
+        } else if (err.code === 'auth/operation-not-allowed' || err.message?.includes('operation-not-allowed')) {
+          msg = 'LinkedIn OAuth provider is not enabled in Firebase Console. Go to Firebase Console > Authentication > Sign-in method, click "Add new provider" > OpenID Connect / LinkedIn, and add your LinkedIn OAuth Client ID & Secret.';
+        } else if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+          msg = 'This domain is not authorized for OAuth in Firebase Console. Go to Authentication > Settings > Authorized Domains and add your Cloud Run domain.';
+        } else if (err.message && err.message.includes('Firebase credentials missing')) {
+          msg = 'Firebase credentials missing. Please configure FIREBASE_API_KEY and FIREBASE_PROJECT_ID.';
+        }
         setError(msg);
         throw new Error(msg);
       }

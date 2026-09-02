@@ -56,21 +56,22 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
           color: '#0A66C2',
           steps: [
             {
-              step: '1. Create App on LinkedIn Developer Portal',
-              desc: 'Go to the LinkedIn Developers Portal (linkedin.com/developers) and create a new App.',
+              step: '1. Create / Open App on LinkedIn Developer Portal',
+              desc: 'Go to the LinkedIn Developers Portal (linkedin.com/developers/apps), create an app (or open existing), and link it to your LinkedIn company page.',
               link: 'https://www.linkedin.com/developers/apps'
             },
             {
               step: '2. Enable "Sign In with LinkedIn using OpenID Connect"',
-              desc: 'Under Products tab, request access to "Sign In with LinkedIn using OpenID Connect".'
+              desc: 'In your LinkedIn app under the "Products" tab, find "Sign In with LinkedIn using OpenID Connect" and click "Request Access". It is granted instantly.'
             },
             {
-              step: '3. Add Authorized Redirect URL',
-              desc: 'In Firebase Console > Authentication > Sign-in method > LinkedIn, copy the OAuth redirect URL (e.g., https://<project>.firebaseapp.com/__/auth/handler) and paste it into the LinkedIn App OAuth 2.0 settings.'
+              step: '3. Add Authorized Redirect URL in LinkedIn',
+              desc: 'Go to the "Auth" tab in your LinkedIn app. Under "OAuth 2.0 settings" > "Authorized redirect URLs for your app", add: https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler'
             },
             {
-              step: '4. Save Client ID & Secret in Firebase',
-              desc: 'Copy the LinkedIn Client ID and Client Secret into your Firebase Console under Authentication > Sign-in method > LinkedIn.'
+              step: '4. Enable LinkedIn in Firebase Authentication',
+              desc: 'In Firebase Console (console.firebase.google.com) > your project (genai-cohort3-ideathon) > Authentication > Sign-in method, click "Add new provider" > OpenID Connect (or LinkedIn), paste your LinkedIn Client ID and Client Secret from the "Auth" tab, and click Save.',
+              link: 'https://console.firebase.google.com/project/genai-cohort3-ideathon/authentication/providers'
             }
           ]
         };

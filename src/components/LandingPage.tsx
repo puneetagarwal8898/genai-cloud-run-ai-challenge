@@ -207,8 +207,10 @@ export const LandingPage: React.FC = () => {
       else if (provider === 'linkedin') await signInWithLinkedIn(isTestMode);
     } catch (err: any) {
       console.warn(`${provider} login notice:`, err.message);
-      // Only pop open the guide modal if credentials are not configured at all
-      if (err.message && err.message.includes('Firebase credentials missing')) {
+      // If the error indicates missing provider setup in Firebase, allow user to view the setup guide
+      if (
+        (err.message && (err.message.includes('requires an OAuth 2.0') || err.message.includes('Firebase credentials missing') || err.message.includes('provider is not enabled') || err.message.includes('operation-not-allowed')))
+      ) {
         setGuideProvider(provider);
         setIsGuideOpen(true);
       } else {
