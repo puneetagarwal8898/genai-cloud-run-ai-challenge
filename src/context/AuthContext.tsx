@@ -9,7 +9,7 @@ import {
   auth,
   getActiveAuth,
   googleProvider,
-  facebookProvider,
+  twitterProvider,
   linkedInProvider,
   linkedInLegacyProvider,
   getFirebaseCredentialsStatus
@@ -33,7 +33,7 @@ interface AuthContextType {
   error: string | null;
   pendingVerification: PendingVerification | null;
   signInWithGoogle: (isTestEnv?: boolean) => Promise<void>;
-  signInWithFacebook: (isTestEnv?: boolean) => Promise<void>;
+  signInWithTwitter: (isTestEnv?: boolean) => Promise<void>;
   signInWithLinkedIn: (isTestEnv?: boolean) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName?: string, isTestEnv?: boolean) => Promise<{ codeSent: boolean; message: string; previewCode?: string }>;
   verifyEmailCode: (email: string, code: string) => Promise<boolean>;
@@ -143,18 +143,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
 
-    // 3. Listen for OAuth popup completion messages (e.g. direct LinkedIn or Facebook OAuth)
+    // 3. Listen for OAuth popup completion messages (e.g. direct LinkedIn OAuth)
     const handleOAuthMessage = (event: MessageEvent) => {
       if (event.data?.type === 'LINKEDIN_AUTH_SUCCESS' && event.data?.profile) {
         saveActiveSession(event.data.profile);
         setError(null);
       } else if (event.data?.type === 'LINKEDIN_AUTH_ERROR') {
         setError(event.data.error || 'LinkedIn authentication failed.');
-      } else if (event.data?.type === 'FACEBOOK_AUTH_SUCCESS' && event.data?.profile) {
-        saveActiveSession(event.data.profile);
-        setError(null);
-      } else if (event.data?.type === 'FACEBOOK_AUTH_ERROR') {
-        setError(event.data.error || 'Facebook authentication failed.');
       }
     };
     window.addEventListener('message', handleOAuthMessage);
@@ -228,16 +223,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithFacebook = async (isTestEnv = false) => {
+  const signInWithTwitter = async (isTestEnv = false) => {
     setError(null);
     try {
       if (isTestEnv) {
         const fallbackProfile: UserProfile = {
-          uid: 'fb_user_' + Math.random().toString(36).substring(2, 9),
-          email: 'facebook.journaler@fb.com',
-          displayName: 'Facebook Authenticated User',
-          photoURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-          authProvider: 'facebook',
+          uid: 'twitter_user_' + Math.random().toString(36).substring(2, 9),
+          email: 'x.reflector@twitter.internal',
+          displayName: 'X / Twitter User',
+          photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          authProvider: 'twitter',
           emailVerified: true,
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
@@ -246,61 +241,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // 1. Check if direct backend Facebook OAuth 2.0 is configured on Cloud Run
-      try {
-        const checkRes = await fetch(`/api/auth/facebook/url?origin=${encodeURIComponent(window.location.origin)}`);
-        if (checkRes.ok) {
-          const checkData = await checkRes.json();
-          if (checkData.isDirectConfigured && checkData.url) {
-            const popup = window.open(
-              checkData.url,
-              'facebook_oauth_direct',
-              'width=600,height=700,status=no,toolbar=no,menubar=no'
-            );
-            if (popup) return;
-          }
-        }
-      } catch (checkErr) {
-        console.warn("Direct Facebook check bypassed:", checkErr);
-      }
-
-      // 2. Otherwise use native Firebase FacebookAuthProvider
-      const result = await signInWithPopup(auth, facebookProvider);
+      // Native Firebase TwitterAuthProvider (OAuth 1.0a / 2.0 with Consumer Key & Secret)
+      const result = await signInWithPopup(auth, twitterProvider);
       const loggedUser = result.user;
       const profile: UserProfile = {
         uid: loggedUser.uid,
-        email: loggedUser.email || `${loggedUser.uid}@facebook.internal`,
-        displayName: loggedUser.displayName || 'Facebook Reflective Mind',
+        email: loggedUser.email || `${loggedUser.uid}@twitter.internal`,
+        displayName: loggedUser.displayName || 'X / Twitter User',
         photoURL: loggedUser.photoURL || null,
-        authProvider: 'facebook',
+        authProvider: 'twitter',
         emailVerified: true,
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
       saveActiveSession(profile);
     } catch (err: any) {
-      console.warn("Facebook Sign-In notice:", err.code, err.message);
-      let msg = err.message || 'Facebook Sign-In failed.';
+      console.warn("Twitter Sign-In notice:", err.code, err.message);
+      let msg = err.message || 'Twitter / X sign-in failed.';
       if (err.code === 'auth/popup-closed-by-user') {
-        msg = 'Facebook Sign-In popup was closed before completing authentication.';
+        msg = 'Twitter sign-in popup was closed before completing authentication.';
       } else if (err.code === 'auth/cancelled-popup-request') {
-        msg = 'Facebook Sign-In popup request was cancelled.';
+        msg = 'Twitter sign-in popup request was cancelled.';
       } else if (err.code === 'auth/account-exists-with-different-credential') {
         const email = err.customData?.email || 'your email';
-        msg = `An account already exists for ${email} with a different sign-in provider (e.g. Google). Please sign in using Google, or in Firebase Console > Authentication > Settings, enable "Allow creation of multiple accounts with the same email address".`;
+        msg = `An account already exists for ${email} with a different sign-in provider (e.g. Google). Please sign in with Google or your primary provider.`;
       } else if (
         err.code === 'auth/operation-not-allowed' ||
         err.message?.includes('operation-not-allowed') ||
         err.message?.includes('OPERATION_NOT_ALLOWED') ||
         err.message?.includes('identity provider configuration is not found')
       ) {
-        msg = 'Facebook Sign-In is not enabled yet in Firebase Console. In Firebase Console > Authentication > Sign-in method, click Facebook, toggle Enable, and enter your Meta App ID & App Secret from Meta for Developers.';
+        msg = 'Twitter / X Sign-In is not enabled yet in Firebase Console. In Firebase Console > Authentication > Sign-in method, click Twitter, toggle Enable, and enter your API Key and API Secret from developer.x.com.';
       } else if (err.code === 'auth/invalid-credential' || err.message?.includes('invalid-credential')) {
-        msg = 'Invalid Facebook credentials. Please verify your Meta App ID and App Secret in Firebase Console match your Meta Developer App Settings > Basic.';
+        msg = 'Invalid Twitter credentials. Please verify your API Key and Secret in Firebase Console match your X Developer Portal Keys & Tokens.';
       } else if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
         msg = 'This domain is not authorized in Firebase Console. In Firebase Console > Authentication > Settings > Authorized domains, add this domain.';
-      } else if (err.message && err.message.includes('requires a Meta App ID')) {
-        msg = err.message;
       }
       setError(msg);
       throw new Error(msg);
@@ -643,7 +618,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error,
         pendingVerification,
         signInWithGoogle,
-        signInWithFacebook,
+        signInWithTwitter,
         signInWithLinkedIn,
         signUpWithEmail,
         verifyEmailCode,

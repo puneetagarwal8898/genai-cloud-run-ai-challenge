@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, TwitterAuthProvider, OAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 
 // Global runtime config declaration
@@ -83,7 +83,7 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-export const facebookProvider = new FacebookAuthProvider();
+export const twitterProvider = new TwitterAuthProvider();
 export const linkedInProvider = new OAuthProvider('oidc.linkedin.com');
 linkedInProvider.addScope('openid');
 linkedInProvider.addScope('profile');

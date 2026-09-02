@@ -22,7 +22,7 @@ import { OAuthGuideModal } from './OAuthGuideModal';
 export const LandingPage: React.FC = () => {
   const {
     signInWithGoogle,
-    signInWithFacebook,
+    signInWithTwitter,
     signInWithLinkedIn,
     signUpWithEmail,
     verifyEmailCode,
@@ -50,7 +50,7 @@ export const LandingPage: React.FC = () => {
   const [localNotice, setLocalNotice] = useState<string | null>(null);
 
   // OAuth helper modal state
-  const [guideProvider, setGuideProvider] = useState<'google' | 'linkedin' | 'facebook' | null>(null);
+  const [guideProvider, setGuideProvider] = useState<'google' | 'linkedin' | 'twitter' | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // 6-digit verification code input state
@@ -196,20 +196,20 @@ export const LandingPage: React.FC = () => {
     }
   };
 
-  const handleOAuthSignIn = async (provider: 'google' | 'linkedin' | 'facebook') => {
+  const handleOAuthSignIn = async (provider: 'google' | 'linkedin' | 'twitter') => {
     setLocalError(null);
     setIsProcessing(true);
     const isTestMode = appEnv === 'test';
 
     try {
       if (provider === 'google') await signInWithGoogle(isTestMode);
-      else if (provider === 'facebook') await signInWithFacebook(isTestMode);
+      else if (provider === 'twitter') await signInWithTwitter(isTestMode);
       else if (provider === 'linkedin') await signInWithLinkedIn(isTestMode);
     } catch (err: any) {
       console.warn(`${provider} login notice:`, err.message);
       // If the error indicates missing provider setup in Firebase, allow user to view the setup guide
       if (
-        (err.message && (err.message.includes('requires an OAuth 2.0') || err.message.includes('Firebase credentials missing') || err.message.includes('provider is not enabled') || err.message.includes('operation-not-allowed')))
+        (err.message && (err.message.includes('requires an OAuth 2.0') || err.message.includes('Firebase credentials missing') || err.message.includes('provider is not enabled') || err.message.includes('operation-not-allowed') || err.message.includes('not enabled yet')))
       ) {
         setGuideProvider(provider);
         setIsGuideOpen(true);
@@ -351,7 +351,7 @@ export const LandingPage: React.FC = () => {
               <div>
                 <p className="font-semibold text-red-300">Notice</p>
                 <p className="mt-0.5 text-red-200/90 leading-relaxed text-xs">{displayError}</p>
-                {(displayError.includes('LinkedIn') || displayError.includes('Facebook') || displayError.includes('Meta')) && (
+                {(displayError.includes('LinkedIn') || displayError.includes('Twitter') || displayError.includes('X ')) && (
                   <div className="mt-2.5 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -384,26 +384,26 @@ export const LandingPage: React.FC = () => {
                         </button>
                       </>
                     )}
-                    {(displayError.includes('Facebook') || displayError.includes('Meta')) && (
+                    {(displayError.includes('Twitter') || displayError.includes('X ')) && (
                       <>
                         <button
                           type="button"
-                          id="error-facebook-demo-btn"
-                          onClick={() => signInWithFacebook(true)}
-                          className="px-2.5 py-1 rounded-lg bg-blue-600/25 hover:bg-blue-600/35 text-[11px] font-medium text-blue-200 transition cursor-pointer"
+                          id="error-twitter-demo-btn"
+                          onClick={() => signInWithTwitter(true)}
+                          className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-[11px] font-medium text-sky-200 transition cursor-pointer"
                         >
-                          Test with Facebook Profile
+                          Test with Twitter Profile
                         </button>
                         <button
                           type="button"
-                          id="error-facebook-guide-btn"
+                          id="error-twitter-guide-btn"
                           onClick={() => {
-                            setGuideProvider('facebook');
+                            setGuideProvider('twitter');
                             setIsGuideOpen(true);
                           }}
                           className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-[11px] font-medium text-indigo-200 transition cursor-pointer"
                         >
-                          View Facebook Guide
+                          View Twitter Guide
                         </button>
                       </>
                     )}
@@ -712,10 +712,10 @@ export const LandingPage: React.FC = () => {
                     <span>Continue with LinkedIn</span>
                   </button>
 
-                  {/* Facebook */}
+                  {/* Twitter / X */}
                   <button
-                    id="facebook-signin-btn"
-                    onClick={() => handleOAuthSignIn('facebook')}
+                    id="twitter-signin-btn"
+                    onClick={() => handleOAuthSignIn('twitter')}
                     disabled={loading || isProcessing}
                     className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl border text-xs sm:text-sm font-medium transition shadow-xs cursor-pointer hover:opacity-90"
                     style={{
@@ -724,10 +724,10 @@ export const LandingPage: React.FC = () => {
                       color: 'var(--text-primary)'
                     }}
                   >
-                    <svg className="w-4 h-4 shrink-0" fill="#1877F2" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                    <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                     </svg>
-                    <span>Continue with Facebook</span>
+                    <span>Continue with X (Twitter)</span>
                   </button>
                 </div>
               )}
@@ -1047,7 +1047,7 @@ export const LandingPage: React.FC = () => {
           guideProvider
             ? () => {
                 if (guideProvider === 'google') signInWithGoogle(true);
-                else if (guideProvider === 'facebook') signInWithFacebook(true);
+                else if (guideProvider === 'twitter') signInWithTwitter(true);
                 else if (guideProvider === 'linkedin') signInWithLinkedIn(true);
               }
             : undefined
