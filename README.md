@@ -203,10 +203,47 @@ gcloud services enable \
   run.googleapis.com \
   cloudbuild.googleapis.com \
   secretmanager.googleapis.com \
-  firestore.googleapis.com
+  firestore.googleapis.com \
+  artifactregistry.googleapis.com
 ```
 
-### Step 3: Deploy to Cloud Run
+### Step 3: Grant Required IAM Roles to the Compute Service Account
+Google Cloud Build uses the default Compute Engine service account for builds from source. Run this block once to grant the required permissions:
+
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+SA="${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+
+# Grant storage access (to read source code tarball)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" \
+  --role="roles/storage.admin"
+
+# Grant Artifact Registry writer (to store built images)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" \
+  --role="roles/artifactregistry.writer"
+
+# Grant Cloud Build builder role
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" \
+  --role="roles/cloudbuild.builds.builder"
+
+# Grant Logging log writer (to stream build logs)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" \
+  --role="roles/logging.logWriter"
+
+# Grant Secret Manager accessor (to read GEMINI_API_KEY)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+*(Alternatively, run the included helper script: `./setup-iam.sh`)*
+
+### Step 4: Deploy to Cloud Run
 Run this single command from your project root. Google Cloud Build will automatically containerize the application and deploy it to Cloud Run:
 
 ```bash
