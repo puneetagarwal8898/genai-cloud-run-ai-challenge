@@ -84,10 +84,15 @@ googleProvider.setCustomParameters({
 });
 
 export const facebookProvider = new FacebookAuthProvider();
-export const linkedInProvider = new OAuthProvider('linkedin.com');
+export const linkedInProvider = new OAuthProvider('oidc.linkedin.com');
 linkedInProvider.addScope('openid');
 linkedInProvider.addScope('profile');
 linkedInProvider.addScope('email');
+
+export const linkedInLegacyProvider = new OAuthProvider('linkedin.com');
+linkedInLegacyProvider.addScope('openid');
+linkedInLegacyProvider.addScope('profile');
+linkedInLegacyProvider.addScope('email');
 
 export const db = getFirestore(app);
 
