@@ -58,7 +58,7 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
   - **Google Sign-In** via Firebase Auth popup.
   - **LinkedIn Sign-In** via OpenID Connect.
   - **Twitter / X Sign-In** via Firebase Auth popup.
-  - **Email & Password** with 6-digit cryptographic verification codes dispatched via email.
+  - **Email & Password** with native Firebase Email Verification links dispatched via Google's infrastructure.
   - **One-Click Test Sandbox Account** for instant development and evaluation.
 - **High-Availability AI Fallback Ladder**:
   - Automated retry ladder: `gemini-3.6-flash` &rarr; `gemini-3.1-flash-lite` &rarr; `gemini-flash-latest` &rarr; `gemini-3.7-flash`.
@@ -83,7 +83,7 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
 | :--- | :--- |
 | **Node.js 20+ & Express** | Full-stack reverse proxy ensuring API keys are never leaked to client bundles. |
 | **@google/genai TypeScript SDK** | Official Google GenAI SDK interfacing with Gemini 3.6 Flash models. |
-| **Nodemailer** | Secure SMTP email dispatch engine for 6-digit verification codes. |
+| **Firebase Auth & Nodemailer** | Secure authentication and notification dispatch engine. |
 | **esbuild** | High-speed server bundler compiling TypeScript into a single self-contained `dist/server.cjs`. |
 
 ### Cloud & Database
@@ -145,8 +145,7 @@ GEMINI_API_KEY="AIzaSy..."
 # Environment Mode: 'test' enables developer tools; 'production' locks to live mode
 APP_ENV="test"
 
-# Optional: Email dispatch configuration for 6-digit confirmation codes
-# If not configured, verification codes are logged directly to the server console
+# Optional: SMTP email dispatch configuration for system notifications
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="465"
 SMTP_SECURE="true"
@@ -428,7 +427,7 @@ The following step-by-step test matrix verifies every critical user interaction:
 | :--- | :--- | :--- |
 | **1. Mobile Responsive UI** | Open the app in a mobile viewport (<640px). | The header shows compact icons (`🧪`/`🚀`, `Sun`/`Moon`, Palette dot) without horizontal overflow or text wrapping. |
 | **2. Production Environment Locking** | Deploy with `APP_ENV=production` or click the `🚀` mode button. | The test sandbox card is removed, the `🧪`/`🚀` switcher is hidden, and the **SSL Encrypted** badge is displayed. |
-| **3. Email Sign-Up & 6-Digit Code** | Enter email/password on Sign Up and click **Verify & Create Account**. | Transitions to 6-digit code entry; upon typing the 6 digits, account activates and navigates into the dashboard. |
+| **3. Email Sign-Up & Verification Link** | Enter email/password on Sign Up and click **Create Sanctuary Account**. | Account registers in Firebase; Google Firebase dispatches a verification link to your inbox; sanctuary dashboard shows the verification banner until verified. |
 | **4. AI Reflection & Follow-Up Chips** | Submit a reflection prompt in the composer. | AI streams a thoughtful response; 3 intelligent follow-up suggestions appear. Typing in composer clears suggestions. |
 | **5. Permanent Reflection Deletion** | Click the trash icon on a past reflection in the sidebar and confirm deletion. | The entry is removed from Firestore and disappears with a smooth exit animation. |
 | **6. Secret Key Isolation** | Inspect browser network requests to `/api/config` or client source. | The `GEMINI_API_KEY` is completely absent from browser bundles; API calls proxy securely through `/api/converse`. |

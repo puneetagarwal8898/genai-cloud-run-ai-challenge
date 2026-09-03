@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   ArrowRight,
   Lock,
-  FlaskConical
+  FlaskConical,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -43,12 +44,23 @@ const THINKING_PHRASES = [
 ];
 
 export const Dashboard: React.FC = () => {
-  const { user, userProfile, signOut } = useAuth();
+  const {
+    user,
+    userProfile,
+    signOut,
+    resendFirebaseVerificationEmail,
+    reloadUserVerificationStatus
+  } = useAuth();
   const { appEnv, setAppEnv, isProductionLocked } = useApp();
 
   const [interactions, setInteractions] = useState<JournalInteraction[]>([]);
   const [activeInteractionId, setActiveInteractionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(true);
+
+  // Email verification banner state
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
+  const [isResendingEmail, setIsResendingEmail] = useState<boolean>(false);
+  const [isCheckingEmail, setIsCheckingEmail] = useState<boolean>(false);
 
   // Input states
   const [title, setTitle] = useState<string>('');
@@ -357,6 +369,41 @@ export const Dashboard: React.FC = () => {
     setDeletingEntryId(null);
   };
 
+  const handleResendVerification = async () => {
+    setIsResendingEmail(true);
+    setVerificationNotice(null);
+    try {
+      await resendFirebaseVerificationEmail();
+      setVerificationNotice('A fresh verification link was sent from Google Firebase to your inbox.');
+      setTimeout(() => setVerificationNotice(null), 6000);
+    } catch (err: any) {
+      setVerificationNotice(err.message || 'Failed to dispatch verification email.');
+      setTimeout(() => setVerificationNotice(null), 6000);
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setIsCheckingEmail(true);
+    setVerificationNotice(null);
+    try {
+      const isVerified = await reloadUserVerificationStatus();
+      if (isVerified) {
+        setVerificationNotice('Email verified successfully! Your account is now fully verified.');
+        setTimeout(() => setVerificationNotice(null), 5000);
+      } else {
+        setVerificationNotice('Email is not verified yet. Please click the link in your email, then click this button again.');
+        setTimeout(() => setVerificationNotice(null), 7000);
+      }
+    } catch (err: any) {
+      setVerificationNotice('Could not check status. Please try again.');
+      setTimeout(() => setVerificationNotice(null), 5000);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
   const getModeIcon = (m: ReflectionMode) => {
     switch (m) {
       case 'reflection': return <Compass className="w-3.5 h-3.5" />;
@@ -464,9 +511,16 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
             <div className="hidden md:block text-left">
-              <p className="text-xs font-semibold leading-tight truncate max-w-[150px]" style={{ color: 'var(--text-primary)' }}>
-                {userProfile?.displayName || "Reflector"}
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs font-semibold leading-tight truncate max-w-[150px]" style={{ color: 'var(--text-primary)' }}>
+                  {userProfile?.displayName || "Reflector"}
+                </p>
+                {userProfile?.emailVerified && (
+                  <span title="Verified Account" className="text-emerald-500 shrink-0">
+                    <CheckCircle2 className="w-3 h-3" />
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -481,6 +535,59 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {/* Email Verification Banner for unverified email users */}
+      {userProfile?.authProvider === 'email' && !userProfile?.emailVerified && (
+        <div
+          id="email-verification-banner"
+          className="border-b px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2.5 transition-colors"
+          style={{
+            backgroundColor: 'rgba(234, 179, 8, 0.08)',
+            borderColor: 'rgba(234, 179, 8, 0.25)',
+            color: 'var(--text-primary)'
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <Mail className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span className="text-[11px] sm:text-xs">
+              Please verify your email (<strong>{userProfile.email}</strong>). We sent a confirmation link from Google Firebase to your inbox.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {verificationNotice && (
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium hidden sm:inline">
+                {verificationNotice}
+              </span>
+            )}
+            <button
+              id="resend-verification-email-btn"
+              disabled={isResendingEmail}
+              onClick={handleResendVerification}
+              className="px-2.5 py-1 rounded-lg border text-[11px] font-medium transition cursor-pointer hover:opacity-80 disabled:opacity-50"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              {isResendingEmail ? 'Sending...' : 'Resend Link'}
+            </button>
+            <button
+              id="check-verification-status-btn"
+              disabled={isCheckingEmail}
+              onClick={handleCheckVerification}
+              className="px-2.5 py-1 rounded-lg text-white text-[11px] font-medium transition cursor-pointer hover:opacity-90 shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+              style={{
+                backgroundColor: 'var(--accent)'
+              }}
+            >
+              <RefreshCw className={`w-3 h-3 ${isCheckingEmail ? 'animate-spin' : ''}`} />
+              <span>{isCheckingEmail ? 'Checking...' : "I've Verified My Email"}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Two-Column Layout */}
       <div className="flex-1 max-w-7xl mx-auto w-full flex flex-col md:flex-row overflow-hidden p-3 sm:p-5 gap-3 sm:gap-5">

@@ -25,12 +25,9 @@ export const LandingPage: React.FC = () => {
     signInWithTwitter,
     signInWithLinkedIn,
     signUpWithEmail,
-    verifyEmailCode,
     signInWithEmail,
-    resendVerificationCode,
-    cancelEmailVerification,
+    resetPassword,
     signInAsDemoUser,
-    pendingVerification,
     loading,
     error,
     clearError,
@@ -57,50 +54,6 @@ export const LandingPage: React.FC = () => {
   const [guideProvider, setGuideProvider] = useState<'google' | 'linkedin' | 'twitter' | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  // 6-digit verification code input state
-  const [codeDigits, setCodeDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // When pendingVerification changes, prepopulate or focus
-  useEffect(() => {
-    if (pendingVerification) {
-      setCodeDigits(['', '', '', '', '', '']);
-      setTimeout(() => {
-        codeInputRefs.current[0]?.focus();
-      }, 100);
-    }
-  }, [pendingVerification]);
-
-  const handleDigitChange = (index: number, value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, '');
-    const newDigits = [...codeDigits];
-
-    if (cleaned.length > 1) {
-      const pastedDigits = cleaned.slice(0, 6).split('');
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = pastedDigits[i] || '';
-      }
-      setCodeDigits(newDigits);
-      const nextIndex = Math.min(pastedDigits.length, 5);
-      codeInputRefs.current[nextIndex]?.focus();
-      return;
-    }
-
-    newDigits[index] = cleaned.slice(-1);
-    setCodeDigits(newDigits);
-
-    // Auto-advance
-    if (cleaned && index < 5) {
-      codeInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !codeDigits[index] && index > 0) {
-      codeInputRefs.current[index - 1]?.focus();
-    }
-  };
-
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
@@ -119,13 +72,31 @@ export const LandingPage: React.FC = () => {
     try {
       const isTestMode = appEnv === 'test';
       const res = await signUpWithEmail(email, password, displayName, isTestMode);
-      if (appEnv === 'production') {
-        setLocalNotice(`A 6-digit verification code was dispatched to ${email}. Please check your inbox and spam folder.`);
+      if (res.directSignIn) {
+        setLocalNotice(res.message || 'Account created successfully! Please check your email to verify your address.');
       } else {
-        setLocalNotice(res.message || 'Verification code initialized.');
+        setLocalNotice('Account created successfully! We sent a confirmation link from Google Firebase to your inbox.');
       }
     } catch (err: any) {
       setLocalError(err.message || 'Failed to initialize email registration.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setLocalError(null);
+    setLocalNotice(null);
+    if (!email.trim() || !email.includes('@')) {
+      setLocalError('Please enter your email address in the field above, then click Forgot Password.');
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await resetPassword(email);
+      setLocalNotice(`Password reset instructions dispatched to ${email}. Please check your inbox.`);
+    } catch (err: any) {
+      setLocalError(err.message || 'Failed to send password reset email.');
     } finally {
       setIsProcessing(false);
     }
@@ -150,51 +121,6 @@ export const LandingPage: React.FC = () => {
       await signInWithEmail(email, password);
     } catch (err: any) {
       setLocalError(err.message || 'Incorrect email or password.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleVerifyCodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    const fullCode = codeDigits.join('');
-
-    if (fullCode.length !== 6) {
-      setLocalError('Please enter the full 6-digit verification code.');
-      return;
-    }
-
-    if (!pendingVerification) {
-      setLocalError('No pending verification session found.');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await verifyEmailCode(pendingVerification.email, fullCode);
-    } catch (err: any) {
-      setLocalError(err.message || 'Invalid or expired verification code.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleResendCode = async () => {
-    if (!pendingVerification) return;
-    setLocalError(null);
-    setLocalNotice(null);
-    setIsProcessing(true);
-    try {
-      const isTestMode = appEnv === 'test';
-      await resendVerificationCode(pendingVerification.email, isTestMode);
-      if (appEnv === 'production') {
-        setLocalNotice('A fresh 6-digit verification code has been dispatched to your inbox.');
-      } else {
-        setLocalNotice(`New test verification code dispatched.`);
-      }
-    } catch (err: any) {
-      setLocalError(err.message || 'Failed to resend verification code.');
     } finally {
       setIsProcessing(false);
     }
@@ -479,136 +405,9 @@ export const LandingPage: React.FC = () => {
             }}
           />
 
-          {/* Conditional View: 6-Digit Email Verification Mode */}
-          {pendingVerification ? (
-            <div className="animate-in fade-in duration-200">
-              <div className="text-center mb-5">
-                <div
-                  className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center border"
-                  style={{
-                    backgroundColor: 'var(--accent-light)',
-                    borderColor: 'var(--accent)'
-                  }}
-                >
-                  <KeyRound className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                </div>
-                <h2 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Email Verification Code
-                </h2>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Verification code dispatched to <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{pendingVerification.email}</span>
-                </p>
-              </div>
-
-              {/* In Test Mode: Show testing preview code if available */}
-              {appEnv === 'test' && pendingVerification.previewCode && (
-                <div
-                  className="mb-4 p-2.5 rounded-lg border text-center text-xs flex items-center justify-between"
-                  style={{
-                    backgroundColor: 'var(--bg-canvas)',
-                    borderColor: 'var(--border-color)',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  <span className="flex items-center gap-1">
-                    <FlaskConical className="w-3 h-3 text-amber-400" />
-                    <span>Test Sandbox Code:</span>
-                  </span>
-                  <span className="font-mono font-bold tracking-widest text-sm" style={{ color: 'var(--accent)' }}>
-                    {pendingVerification.previewCode}
-                  </span>
-                </div>
-              )}
-
-              {appEnv === 'production' && (
-                <div
-                  className="mb-4 p-2.5 rounded-lg border text-xs"
-                  style={{
-                    backgroundColor: 'var(--bg-canvas)',
-                    borderColor: 'var(--border-color)',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  <p className="leading-snug">
-                    Enter the 6-digit code delivered to your email inbox. Please check your spam folder if it does not arrive within 60 seconds.
-                  </p>
-                </div>
-              )}
-
-              <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">
-                {/* 6 Digit Input Boxes */}
-                <div className="flex justify-between gap-1.5 sm:gap-2">
-                  {codeDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => { codeInputRefs.current[idx] = el; }}
-                      id={`digit-input-${idx}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                      className="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-mono font-bold rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      style={{
-                        backgroundColor: 'var(--bg-input)',
-                        borderColor: digit ? 'var(--accent)' : 'var(--border-color)',
-                        color: 'var(--text-primary)'
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  type="submit"
-                  id="verify-code-btn"
-                  disabled={isProcessing}
-                  className="w-full py-2.5 px-4 rounded-xl text-white text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 shadow-xs"
-                  style={{
-                    backgroundColor: 'var(--accent)',
-                    boxShadow: '0 0 15px var(--accent-glow)'
-                  }}
-                >
-                  {isProcessing ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Activate &amp; Enter Journal</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <button
-                    type="button"
-                    onClick={handleResendCode}
-                    className="hover:underline cursor-pointer"
-                    style={{ color: 'var(--accent)' }}
-                  >
-                    Resend code
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cancelEmailVerification();
-                      setLocalError(null);
-                    }}
-                    className="hover:underline cursor-pointer"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    Cancel / Back
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            /* Standard Authentication Portal */
-            <div>
-              <h2 className="text-base sm:text-lg font-semibold text-center mb-1" style={{ color: 'var(--text-primary)' }}>
+          {/* Standard Authentication Portal */}
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-center mb-1" style={{ color: 'var(--text-primary)' }}>
                 Access Your Private Journal
               </h2>
               <p className="text-xs text-center mb-5" style={{ color: 'var(--text-muted)' }}>
@@ -847,9 +646,20 @@ export const LandingPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
-                      Password
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        id="forgot-password-link"
+                        onClick={handleForgotPassword}
+                        className="text-[11px] hover:underline cursor-pointer transition"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                     <div className="relative">
                       <input
                         id="signin-password-input"
@@ -987,7 +797,7 @@ export const LandingPage: React.FC = () => {
                   <div className="p-2.5 rounded-lg border text-[11px] flex items-center gap-2" style={{ backgroundColor: 'var(--bg-canvas)', borderColor: 'var(--border-color)' }}>
                     <KeyRound className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <span style={{ color: 'var(--text-muted)' }}>
-                      A secure 6-digit verification code will be dispatched to verify your email.
+                      End-to-end encrypted session. Instant account setup with email verification.
                     </span>
                   </div>
 
@@ -1005,7 +815,7 @@ export const LandingPage: React.FC = () => {
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <>
-                        <span>Verify &amp; Create Account</span>
+                        <span>Create Sanctuary Account</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}
@@ -1064,7 +874,6 @@ export const LandingPage: React.FC = () => {
                 </>
               )}
             </div>
-          )}
 
           {/* Security Certifications */}
           <div
