@@ -417,6 +417,7 @@ app.post("/api/auth/verify-code", (req, res) => {
 
     // Success - consume code
     verificationCodeStore.delete(email);
+    deletedAccountsSet.delete(email);
     res.json({
       success: true,
       verified: true,
@@ -532,6 +533,20 @@ app.get("/api/auth/check-status", (req, res) => {
     isDeleted,
     message: isDeleted ? "This account doesn't exist. Please create an account to get started." : "Account status verified."
   });
+});
+
+// Endpoint to clear deleted status when an account is newly registered
+app.post("/api/auth/clear-deleted-status", (req, res) => {
+  try {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const email = (typeof body.email === "string" ? body.email : "").trim().toLowerCase();
+    if (email) {
+      deletedAccountsSet.delete(email);
+    }
+    res.json({ success: true, isDeleted: false });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to clear deleted status." });
+  }
 });
 
 // LinkedIn OAuth 2.0 direct authorization and exchange endpoints

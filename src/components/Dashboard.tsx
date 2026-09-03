@@ -499,6 +499,11 @@ export const Dashboard: React.FC = () => {
                 >
                   <Lock className="w-2.5 h-2.5 shrink-0" />
                   <span className="hidden xs:inline sm:inline">Private & Safe</span>
+                  <InfoTooltip
+                    asSpan
+                    size="xs"
+                    text="Your private session is isolated. Reflections are encrypted and never shared with unauthorized parties."
+                  />
                 </span>
               ) : (
                 <button
@@ -515,6 +520,11 @@ export const Dashboard: React.FC = () => {
                 >
                   <FlaskConical className="w-2.5 h-2.5 shrink-0" />
                   <span className="hidden sm:inline">Preview Mode</span>
+                  <InfoTooltip
+                    asSpan
+                    size="xs"
+                    text="Currently in Preview Mode for testing. Click to switch to live Production mode."
+                  />
                 </button>
               )}
             </h1>
@@ -526,63 +536,69 @@ export const Dashboard: React.FC = () => {
           <ThemeSelector />
 
           {/* Standout Features Nav Cluster */}
-          <div className="hidden lg:flex items-center gap-1.5 pl-1 border-l" style={{ borderColor: 'var(--border-color)' }}>
-            <div className="flex items-center gap-1">
-              <button
-                id="open-resonance-map-btn"
-                type="button"
-                onClick={() => setShowResonanceMap(true)}
-                title="Echoes of Mind - Thought Constellation"
-                className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--bg-card-elevated)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <Compass className="w-3.5 h-3.5 text-amber-500" />
-                <span>Thought Map</span>
-              </button>
-              <InfoTooltip text="See a sky map of your thoughts mapped by how you felt when writing (Calm, Gratitude, Clarity, etc.)." />
-            </div>
+          <div className="hidden lg:flex items-center gap-2 pl-1.5 border-l" style={{ borderColor: 'var(--border-color)' }}>
+            <button
+              id="open-resonance-map-btn"
+              type="button"
+              onClick={() => setShowResonanceMap(true)}
+              aria-label="Thought Map - Echoes of Mind"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>Thought Map</span>
+              <InfoTooltip
+                asSpan
+                size="sm"
+                text="See a sky map of your thoughts mapped by how you felt when writing (Calm, Gratitude, Clarity, etc.)."
+              />
+            </button>
 
-            <div className="flex items-center gap-1">
-              <button
-                id="open-time-capsule-btn"
-                type="button"
-                onClick={() => setShowTimeCapsule(true)}
-                title="Time Capsule - Letters to your future self"
-                className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--bg-card-elevated)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <Clock className="w-3.5 h-3.5 text-amber-500" />
-                <span>Time Capsule</span>
-              </button>
-              <InfoTooltip text="Lock away a journal entry to open in 7, 30, 90, or 365 days, and discover how you've grown." />
-            </div>
+            <button
+              id="open-time-capsule-btn"
+              type="button"
+              onClick={() => setShowTimeCapsule(true)}
+              aria-label="Time Capsule - Letters to your future self"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>Time Capsule</span>
+              <InfoTooltip
+                asSpan
+                size="sm"
+                text="Lock away a journal entry to open in 7, 30, 90, or 365 days, and discover how you've grown."
+              />
+            </button>
 
-            <div className="flex items-center gap-1">
-              <button
-                id="open-location-sanctuary-btn"
-                type="button"
-                onClick={() => setShowLocationModal(true)}
-                title="Peaceful Places - Tag a location"
-                className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--bg-card-elevated)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                <span>Peaceful Places</span>
-              </button>
-              <InfoTooltip text="Attach a real-world tranquil spot where you wrote your reflection, like a quiet park, favorite cafe, or porch." />
-            </div>
+            <button
+              id="open-location-sanctuary-btn"
+              type="button"
+              onClick={() => setShowLocationModal(true)}
+              aria-label="Peaceful Places - Tag a location"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>Peaceful Places</span>
+              <InfoTooltip
+                asSpan
+                size="sm"
+                text="Attach a real-world tranquil spot where you wrote your reflection, like a quiet park, favorite cafe, or porch."
+              />
+            </button>
 
             <button
               id="open-about-modal-header-btn"
@@ -591,16 +607,21 @@ export const Dashboard: React.FC = () => {
                 setNavigatedFromSettings(false);
                 setShowAboutModal(true);
               }}
-              title="About & FAQ"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
+              aria-label="About Sanctuary & FAQ"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
               style={{
                 backgroundColor: 'var(--bg-card-elevated)',
                 borderColor: 'var(--border-color)',
                 color: 'var(--text-primary)'
               }}
             >
-              <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+              <HelpCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>About</span>
+              <InfoTooltip
+                asSpan
+                size="sm"
+                text="Learn more about Sanctuary, security safeguards, zero-knowledge architecture, and frequently asked questions."
+              />
             </button>
           </div>
 

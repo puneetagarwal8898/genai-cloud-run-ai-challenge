@@ -2,12 +2,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
 
-interface InfoTooltipProps {
+export interface InfoTooltipProps {
   text: string;
   label?: string;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   position?: 'top' | 'bottom' | 'auto';
   className?: string;
+  asSpan?: boolean;
 }
 
 export const InfoTooltip: React.FC<InfoTooltipProps> = ({
@@ -15,11 +16,12 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   label,
   size = 'sm',
   position = 'auto',
-  className = ''
+  className = '',
+  asSpan = false
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; placeAbove: boolean } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
 
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
@@ -91,32 +93,72 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     };
   }, [isVisible, updatePosition]);
 
-  const iconDimension = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
+  const iconDimension = size === 'xs' ? 'w-2.5 h-2.5' : size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
 
   return (
     <span className={`inline-flex items-center align-middle ${className}`}>
-      <button
-        ref={triggerRef}
-        type="button"
-        onMouseEnter={showTooltip}
-        onMouseLeave={hideTooltip}
-        onFocus={showTooltip}
-        onBlur={hideTooltip}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (isVisible) {
-            hideTooltip();
-          } else {
-            showTooltip();
-          }
-        }}
-        aria-label={label || text}
-        className="rounded-full p-0.5 transition opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-amber-500/50 cursor-pointer inline-flex items-center justify-center text-current"
-        style={{ color: 'var(--text-muted)' }}
-      >
-        <Info className={iconDimension} />
-      </button>
+      {asSpan ? (
+        <span
+          ref={triggerRef}
+          role="button"
+          tabIndex={0}
+          onMouseEnter={showTooltip}
+          onMouseLeave={hideTooltip}
+          onFocus={showTooltip}
+          onBlur={hideTooltip}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isVisible) {
+              hideTooltip();
+            } else {
+              showTooltip();
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isVisible) hideTooltip();
+              else showTooltip();
+            }
+          }}
+          aria-label={label || text}
+          className="rounded-full p-0.5 transition opacity-60 hover:opacity-100 hover:text-amber-500 focus:opacity-100 focus:outline-none cursor-pointer inline-flex items-center justify-center text-current"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Info className={iconDimension} />
+        </span>
+      ) : (
+        <button
+          ref={triggerRef as any}
+          type="button"
+          onMouseEnter={showTooltip}
+          onMouseLeave={hideTooltip}
+          onFocus={showTooltip}
+          onBlur={hideTooltip}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isVisible) {
+              hideTooltip();
+            } else {
+              showTooltip();
+            }
+          }}
+          aria-label={label || text}
+          className="rounded-full p-0.5 transition opacity-60 hover:opacity-100 hover:text-amber-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-amber-500/50 cursor-pointer inline-flex items-center justify-center text-current"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Info className={iconDimension} />
+        </button>
+      )}
 
       {isVisible && coords && typeof document !== 'undefined' &&
         createPortal(

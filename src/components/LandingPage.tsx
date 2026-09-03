@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { ThemeSelector } from './ThemeSelector';
 import { OAuthGuideModal } from './OAuthGuideModal';
+import { InfoTooltip } from './InfoTooltip';
 
 export const LandingPage: React.FC = () => {
   const {
@@ -54,6 +55,12 @@ export const LandingPage: React.FC = () => {
   // OAuth helper modal state
   const [guideProvider, setGuideProvider] = useState<'google' | 'linkedin' | 'twitter' | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  const handleSwitchAuthMode = (newMode: 'social' | 'email_signin' | 'email_signup') => {
+    setAuthMode(newMode);
+    setPassword('');
+    setLocalError(null);
+  };
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,10 +299,7 @@ export const LandingPage: React.FC = () => {
                     <button
                       type="button"
                       id="error-create-account-btn"
-                      onClick={() => {
-                        setAuthMode('email_signup');
-                        setLocalError(null);
-                      }}
+                      onClick={() => handleSwitchAuthMode('email_signup')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition shadow-sm cursor-pointer hover:opacity-90"
                       style={{
                         backgroundColor: 'var(--accent)',
@@ -406,6 +410,11 @@ export const LandingPage: React.FC = () => {
           >
             <Shield className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
             <span>Zero-Knowledge Data Privacy &bull; 256-Bit SSL/TLS Encryption</span>
+            <InfoTooltip
+              asSpan
+              size="xs"
+              text="Your journals and reflections are guarded under zero-knowledge encryption, isolated strictly to your account, and never shared or used to train public AI models."
+            />
           </div>
           <h1 className="text-3xl sm:text-5xl font-sans tracking-tight mb-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
             Reflect clearly. Discover calm clarity.
@@ -450,7 +459,7 @@ export const LandingPage: React.FC = () => {
                 <button
                   type="button"
                   id="tab-social"
-                  onClick={() => { setAuthMode('social'); setLocalError(null); }}
+                  onClick={() => handleSwitchAuthMode('social')}
                   className="flex-1 py-1.5 rounded-lg transition text-center cursor-pointer relative"
                   style={{
                     backgroundColor: authMode === 'social' ? 'var(--bg-card)' : 'transparent',
@@ -477,7 +486,7 @@ export const LandingPage: React.FC = () => {
                 <button
                   type="button"
                   id="tab-email-signin"
-                  onClick={() => { setAuthMode('email_signin'); setLocalError(null); }}
+                  onClick={() => handleSwitchAuthMode('email_signin')}
                   className="flex-1 py-1.5 rounded-lg transition text-center cursor-pointer relative"
                   style={{
                     backgroundColor: authMode === 'email_signin' ? 'var(--bg-card)' : 'transparent',
@@ -504,7 +513,7 @@ export const LandingPage: React.FC = () => {
                 <button
                   type="button"
                   id="tab-email-signup"
-                  onClick={() => { setAuthMode('email_signup'); setLocalError(null); }}
+                  onClick={() => handleSwitchAuthMode('email_signup')}
                   className="flex-1 py-1.5 rounded-lg transition text-center cursor-pointer"
                   style={{
                     backgroundColor: authMode === 'email_signup' ? 'var(--bg-card)' : 'transparent',
@@ -689,6 +698,7 @@ export const LandingPage: React.FC = () => {
                       <input
                         id="signin-password-input"
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -796,6 +806,7 @@ export const LandingPage: React.FC = () => {
                       <input
                         id="signup-password-input"
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         required
                         minLength={6}
                         value={password}
