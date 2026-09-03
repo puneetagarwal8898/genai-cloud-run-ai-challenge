@@ -1,9 +1,11 @@
+export type AuthProviderType = 'google' | 'linkedin' | 'twitter' | 'email';
+
 export interface UserProfile {
   uid: string;
   email: string;
   displayName?: string | null;
   photoURL?: string | null;
-  authProvider?: 'google' | 'linkedin' | 'twitter' | 'email' | 'demo';
+  authProvider?: AuthProviderType | 'demo';
   emailVerified?: boolean;
   createdAt: string;
   lastActiveAt?: string;
