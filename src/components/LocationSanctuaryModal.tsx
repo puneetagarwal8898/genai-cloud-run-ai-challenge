@@ -10,7 +10,6 @@ import {
 import { motion } from 'motion/react';
 import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { SanctuaryLocation, JournalInteraction } from '../types';
-import { InfoTooltip } from './InfoTooltip';
 
 interface LocationSanctuaryModalProps {
   isOpen: boolean;
@@ -120,12 +119,9 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
               <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
-                  Peaceful Places &bull; Location Tag
-                </h2>
-                <InfoTooltip text="Tag a tranquil place in the real world where you wrote your reflection, like a quiet park, favorite cafe, or quiet room at home." />
-              </div>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
+                Peaceful Places &bull; Location Tag
+              </h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Remember the peaceful atmosphere where you found clarity
               </p>
@@ -237,12 +233,9 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
           {/* Location Name & Device Position */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Place Name / Label
-                </label>
-                <InfoTooltip text="Give your spot a name, like 'My Garden Porch' or 'Quiet Corner Cafe'." />
-              </div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Place Name / Label
+              </label>
               <input
                 id="location-name-input"
                 type="text"
@@ -278,12 +271,9 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
 
           {/* Sanctuary Geographies Presets */}
           <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                Or Choose a Peaceful Destination
-              </span>
-              <InfoTooltip text="Preset tranquil natural locations around the world known for mindfulness and calm." />
-            </div>
+            <span className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+              Or Choose a Peaceful Destination
+            </span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {SANCTUARY_PRESETS.map((preset) => (
                 <button

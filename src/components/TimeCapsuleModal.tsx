@@ -12,7 +12,6 @@ import {
 import { motion } from 'motion/react';
 import { JournalInteraction, TimeCapsuleData } from '../types';
 import { saveJournalInteraction } from '../services/journalService';
-import { InfoTooltip } from './InfoTooltip';
 
 interface TimeCapsuleModalProps {
   isOpen: boolean;
@@ -193,12 +192,9 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
-                  Time Capsule Vault
-                </h2>
-                <InfoTooltip text="Seal a personal letter or reflection away for a chosen period. When unlocked, celebrate how much your thoughts and perspective have grown." />
-              </div>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
+                Time Capsule Vault
+              </h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Seal reflections across time to witness your personal growth
               </p>
@@ -279,12 +275,9 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
 
                   {/* Future Duration Picker */}
                   <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                        Seal Duration
-                      </label>
-                      <InfoTooltip text="Choose how long to keep this letter sealed before opening it." />
-                    </div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                      Seal Duration
+                    </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
                         { days: 7, label: '7 Days', desc: 'Short check-in' },
@@ -314,12 +307,9 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
 
                   {/* Note to future self */}
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                        Letter or Note to Future Self
-                      </label>
-                      <InfoTooltip text="Write a question or encouraging thought you want your future self to remember when opening this." />
-                    </div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                      Letter or Note to Future Self
+                    </label>
                     <textarea
                       rows={3}
                       value={capsuleNote}

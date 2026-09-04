@@ -486,7 +486,6 @@ export const Dashboard: React.FC = () => {
           <div>
             <h1 className="font-semibold text-sm tracking-tight flex items-center gap-1.5 sm:gap-2" style={{ color: 'var(--text-primary)' }}>
               <span>ReflectAI</span>
-              <InfoTooltip text="Your private, mindful space for reflective writing, personal clarity, and peaceful contemplation." />
               {appEnv === 'production' || isProductionLocked ? (
                 <span
                   className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full"
@@ -584,24 +583,21 @@ export const Dashboard: React.FC = () => {
               <InfoTooltip text="Attach a real-world tranquil spot where you wrote your reflection, like a quiet park, favorite cafe, or porch." />
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                id="open-about-modal-header-btn"
-                type="button"
-                onClick={() => setShowAboutModal(true)}
-                title="About & FAQ"
-                className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--bg-card-elevated)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
-                <span>About</span>
-              </button>
-              <InfoTooltip text="Learn about the difference between Sanctuary (your calming atmosphere) and Journal (your reflections), plus simple FAQs." />
-            </div>
+            <button
+              id="open-about-modal-header-btn"
+              type="button"
+              onClick={() => setShowAboutModal(true)}
+              title="About & FAQ"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+              <span>About</span>
+            </button>
           </div>
 
           <button
@@ -753,7 +749,6 @@ export const Dashboard: React.FC = () => {
               <span className="text-xs font-semibold tracking-tight capitalize" style={{ color: 'var(--text-primary)' }}>
                 {getDynamicSidebarTitle()}
               </span>
-              <InfoTooltip text="Your collection of saved personal journal reflections. Click any entry to read or continue the conversation." />
               <span
                 className="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-medium"
                 style={{
@@ -926,12 +921,9 @@ export const Dashboard: React.FC = () => {
               >
                 <Shield className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
                 <div className="overflow-hidden flex-1">
-                  <div className="flex items-center gap-1">
-                    <p className="text-[10px] font-medium leading-tight" style={{ color: 'var(--text-secondary)' }}>
-                      Private & Personal Space
-                    </p>
-                    <InfoTooltip text="Your reflections are completely private to your account. Only you can read what you write." />
-                  </div>
+                  <p className="text-[10px] font-medium leading-tight" style={{ color: 'var(--text-secondary)' }}>
+                    Private & Personal Space
+                  </p>
                   <p className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>
                     {interactions.length} {interactions.length === 1 ? 'reflection' : 'reflections'} saved
                   </p>
@@ -1007,32 +999,29 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Reflection Modes Selector */}
-            <div className="flex items-center gap-1.5">
-              <div
-                className="flex items-center gap-1 p-1 rounded-xl border"
-                style={{
-                  backgroundColor: 'var(--bg-canvas)',
-                  borderColor: 'var(--border-color)'
-                }}
-              >
-                {(['reflection', 'brainstorm', 'summary', 'advice'] as ReflectionMode[]).map(m => (
-                  <button
-                    key={m}
-                    id={`mode-btn-${m}`}
-                    onClick={() => setMode(m)}
-                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium capitalize transition cursor-pointer"
-                    style={{
-                      backgroundColor: mode === m ? 'var(--accent)' : 'transparent',
-                      color: mode === m ? '#ffffff' : 'var(--text-muted)',
-                      boxShadow: mode === m ? '0 0 10px var(--accent-glow)' : 'none'
-                    }}
-                  >
-                    {getModeIcon(m)}
-                    <span className="capitalize">{m}</span>
-                  </button>
-                ))}
-              </div>
-              <InfoTooltip text="Choose the style of response you want: Reflection (mindful contemplation), Brainstorm (creative ideas), Summary (concise essence), or Advice (practical next steps)." />
+            <div
+              className="flex items-center gap-1 p-1 rounded-xl border"
+              style={{
+                backgroundColor: 'var(--bg-canvas)',
+                borderColor: 'var(--border-color)'
+              }}
+            >
+              {(['reflection', 'brainstorm', 'summary', 'advice'] as ReflectionMode[]).map(m => (
+                <button
+                  key={m}
+                  id={`mode-btn-${m}`}
+                  onClick={() => setMode(m)}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium capitalize transition cursor-pointer"
+                  style={{
+                    backgroundColor: mode === m ? 'var(--accent)' : 'transparent',
+                    color: mode === m ? '#ffffff' : 'var(--text-muted)',
+                    boxShadow: mode === m ? '0 0 10px var(--accent-glow)' : 'none'
+                  }}
+                >
+                  {getModeIcon(m)}
+                  <span className="capitalize">{m}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1317,46 +1306,40 @@ export const Dashboard: React.FC = () => {
                       />
 
                       {/* Location-Aware Sanctuary Journey Tagger */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          id="tag-location-btn"
-                          type="button"
-                          onClick={() => setShowLocationModal(true)}
-                          className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85 cursor-pointer"
-                          style={{
-                            backgroundColor: stagedLocation ? 'rgba(217, 119, 6, 0.12)' : 'var(--bg-card-elevated)',
-                            borderColor: stagedLocation ? '#d97706' : 'var(--border-color)',
-                            color: stagedLocation ? '#d97706' : 'var(--text-muted)'
-                          }}
-                          title="Tag a tranquil place"
-                        >
-                          <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                          <span className="max-w-[110px] truncate text-[11px]">
-                            {stagedLocation ? stagedLocation.placeName : 'Tag Place'}
-                          </span>
-                        </button>
-                        <InfoTooltip text="Tag a meaningful place where you wrote this, like a calm park, quiet library, or cozy nook." />
-                      </div>
+                      <button
+                        id="tag-location-btn"
+                        type="button"
+                        onClick={() => setShowLocationModal(true)}
+                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85 cursor-pointer"
+                        style={{
+                          backgroundColor: stagedLocation ? 'rgba(217, 119, 6, 0.12)' : 'var(--bg-card-elevated)',
+                          borderColor: stagedLocation ? '#d97706' : 'var(--border-color)',
+                          color: stagedLocation ? '#d97706' : 'var(--text-muted)'
+                        }}
+                        title="Tag a tranquil place where you wrote this reflection"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="max-w-[110px] truncate text-[11px]">
+                          {stagedLocation ? stagedLocation.placeName : 'Tag Place'}
+                        </span>
+                      </button>
 
                       {/* Serenity Time Capsule Seal shortcut */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          id="capsule-active-btn"
-                          type="button"
-                          onClick={() => setShowTimeCapsule(true)}
-                          className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85 cursor-pointer"
-                          style={{
-                            backgroundColor: 'var(--bg-card-elevated)',
-                            borderColor: 'var(--border-color)',
-                            color: 'var(--text-muted)'
-                          }}
-                          title="Seal in Time Capsule"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-amber-500" />
-                          <span className="text-[11px] hidden sm:inline">Time Capsule</span>
-                        </button>
-                        <InfoTooltip text="Lock this thought away to re-read in the future and reflect on your personal journey." />
-                      </div>
+                      <button
+                        id="capsule-active-btn"
+                        type="button"
+                        onClick={() => setShowTimeCapsule(true)}
+                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85 cursor-pointer"
+                        style={{
+                          backgroundColor: 'var(--bg-card-elevated)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-muted)'
+                        }}
+                        title="Seal this entry in a Time Capsule to re-read in the future"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-[11px] hidden sm:inline">Time Capsule</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">

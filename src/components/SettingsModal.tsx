@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { InfoTooltip } from './InfoTooltip';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -181,12 +180,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               <Sliders className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
-                  Settings & Preferences
-                </h2>
-                <InfoTooltip text="Manage your journal profile, voice reading preferences, and account privacy." />
-              </div>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
+                Settings & Preferences
+              </h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Customize your peaceful journaling experience
               </p>
@@ -288,12 +284,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             <form onSubmit={handleSaveProfile} className="space-y-6">
               {/* Avatar Selector */}
               <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    Your Avatar
-                  </label>
-                  <InfoTooltip text="Choose an avatar picture that reflects how you feel during your journal sessions." />
-                </div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Your Avatar
+                </label>
 
                 <div className="flex items-center gap-4 mb-3">
                   <img
@@ -363,12 +356,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
               {/* Display Name Field */}
               <div>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    Your Name
-                  </label>
-                  <InfoTooltip text="How you want ReflectAI to address you in reflections and welcomes." />
-                </div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Your Name
+                </label>
                 <input
                   id="settings-display-name-input"
                   type="text"
@@ -389,12 +379,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               {/* Email Field (Locked by Design) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                      Email Address
-                    </label>
-                    <InfoTooltip text="Your sign-in email address. It is locked to keep your account safe and verified." />
-                  </div>
+                  <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Email Address
+                  </label>
                   <span
                     className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border"
                     style={{
@@ -483,12 +470,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           {activeTab === 'preferences' && (
             <div className="space-y-6">
               <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Voice & Audio Reading Preferences
-                  </h3>
-                  <InfoTooltip text="Configure how reflection responses are read back to you when you tap Listen." />
-                </div>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Voice & Audio Reading Preferences
+                </h3>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   Customize the pacing and soothing sound while listening to your reflections
                 </p>
@@ -508,7 +492,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                     <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                       Calming 432Hz Ambient Sound
                     </span>
-                    <InfoTooltip text="A gentle background hum tuned to 432Hz that plays softly while listening to your reflection, helping settle busy thoughts." />
                   </div>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Plays a soft, restful background tone while listening to entries
@@ -534,10 +517,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               {/* Voice Speed Slider */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                  <div className="flex items-center gap-1.5">
-                    <span>Reading Speed: {voiceRate.toFixed(2)}x</span>
-                    <InfoTooltip text="Make the voice reading slower or faster to suit your comfort level." />
-                  </div>
+                  <span>Reading Speed: {voiceRate.toFixed(2)}x</span>
                   <span style={{ color: 'var(--text-muted)' }}>
                     {voiceRate < 0.9 ? 'Slow & Gentle' : voiceRate > 1.05 ? 'Brisk' : 'Natural Pacing'}
                   </span>
@@ -557,10 +537,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               {/* Voice Pitch Slider */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                  <div className="flex items-center gap-1.5">
-                    <span>Voice Tone (Pitch): {voicePitch.toFixed(2)}</span>
-                    <InfoTooltip text="Slightly raise or lower the pitch of the spoken reading voice." />
-                  </div>
+                  <span>Voice Tone (Pitch): {voicePitch.toFixed(2)}</span>
                   <span style={{ color: 'var(--text-muted)' }}>
                     {voicePitch < 0.9 ? 'Warm & Deep' : voicePitch > 1.1 ? 'Light' : 'Balanced'}
                   </span>
@@ -598,12 +575,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           {activeTab === 'security' && (
             <div className="space-y-6">
               <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Account Privacy & Deletion
-                  </h3>
-                  <InfoTooltip text="Manage your account access, request password updates, or permanently remove all your data." />
-                </div>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Account Privacy & Deletion
+                </h3>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   You retain complete ownership over all your journal entries and personal data
                 </p>

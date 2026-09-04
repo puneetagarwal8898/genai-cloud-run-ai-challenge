@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { JournalInteraction, SanctuaryMood } from '../types';
-import { InfoTooltip } from './InfoTooltip';
 
 interface ResonanceMapModalProps {
   isOpen: boolean;
@@ -149,12 +148,9 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
               <Compass className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
-                  Echoes of Mind &bull; Thought Constellation
-                </h2>
-                <InfoTooltip text="A sky map of your thoughts. Each thought is placed like a gentle star based on how you felt when writing (such as Calm, Gratitude, or Courage)." />
-              </div>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
+                Echoes of Mind &bull; Thought Constellation
+              </h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 A visual constellation of your reflections and feelings over time
               </p>
@@ -240,13 +236,10 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
               }}
             >
               <div className="relative z-10 flex justify-between items-start">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                    <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                    Thought Stars
-                  </span>
-                  <InfoTooltip text="Click on any thought star to see what you wrote and revisit your reflection." />
-                </div>
+                <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                  <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                  Thought Stars
+                </span>
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                   Showing {filteredInteractions.length} reflections
                 </span>
@@ -322,7 +315,6 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                 <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Feeling Balance Breakdown
                 </span>
-                <InfoTooltip text="The distribution of feelings across your journal reflections." />
               </div>
               <div
                 className="h-2.5 w-full rounded-full overflow-hidden flex"

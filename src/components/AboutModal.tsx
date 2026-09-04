@@ -13,7 +13,6 @@ import {
   HelpCircle,
   Feather
 } from 'lucide-react';
-import { InfoTooltip } from './InfoTooltip';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -113,12 +112,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({
               <Feather className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base sm:text-lg font-semibold tracking-tight">
-                  About ReflectAI
-                </h2>
-                <InfoTooltip text="Learn how ReflectAI works, explore the meaning behind each feature, and browse common questions." />
-              </div>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight">
+                About ReflectAI
+              </h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Your calm, personal sanctuary for everyday reflection
               </p>
@@ -164,13 +160,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
           {/* Simple Explanation: Journal vs. Sanctuary */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                <Compass className="w-3.5 h-3.5" />
-                Understanding Sanctuary & Journal
-              </h3>
-              <InfoTooltip text="How your quiet atmosphere (Sanctuary) and your written thoughts (Journal) come together." />
-            </div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+              <Compass className="w-3.5 h-3.5" />
+              Understanding Sanctuary & Journal
+            </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div
