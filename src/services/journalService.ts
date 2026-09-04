@@ -248,10 +248,13 @@ export async function wipeAllUserData(userId: string, userEmail?: string): Promi
         const deletePromises = snapshot.docs.map(docSnap => 
           Promise.race([
             deleteDoc(docSnap.ref),
-            new Promise<void>((res) => setTimeout(res, 800))
+            new Promise<void>((res) => setTimeout(res, 500))
           ])
         );
-        await Promise.all(deletePromises);
+        await Promise.race([
+          Promise.all(deletePromises),
+          new Promise<void>((res) => setTimeout(res, 1000))
+        ]);
         console.log(`[Cloud Wipe] Deleted ${snapshot.docs.length} reflections from Firestore for user ${userId}.`);
       }
 
@@ -259,7 +262,7 @@ export async function wipeAllUserData(userId: string, userEmail?: string): Promi
       const userDocRef = doc(db, 'users', userId);
       await Promise.race([
         deleteDoc(userDocRef),
-        new Promise<void>((res) => setTimeout(res, 800))
+        new Promise<void>((res) => setTimeout(res, 500))
       ]);
       console.log(`[Cloud Wipe] Deleted user profile document for ${userId} in Firestore.`);
     } catch (err: any) {

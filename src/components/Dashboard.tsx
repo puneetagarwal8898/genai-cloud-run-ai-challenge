@@ -67,6 +67,7 @@ export const Dashboard: React.FC = () => {
   const {
     user,
     userProfile,
+    isDeletingAccount,
     signOut,
     resendFirebaseVerificationEmail,
     reloadUserVerificationStatus,
@@ -191,6 +192,20 @@ export const Dashboard: React.FC = () => {
 
   // Synchronize modal state changes into the active browser URL
   useEffect(() => {
+    if (isDeletingAccount) {
+      setShowSettingsModal(false);
+      setShowExportPdfModal(false);
+      setShowTwoFactorSetup(false);
+      setShowAboutModal(false);
+      setShowLegalModal(false);
+      setShowResonanceMap(false);
+      setShowTimeCapsule(false);
+      setShowLocationModal(false);
+      setShowVerifyModal(false);
+      syncModalUrl(null);
+      return;
+    }
+
     if (showExportPdfModal) {
       syncModalUrl('export-pdf');
     } else if (showTwoFactorSetup) {
@@ -213,6 +228,7 @@ export const Dashboard: React.FC = () => {
       syncModalUrl(null);
     }
   }, [
+    isDeletingAccount,
     showSettingsModal,
     settingsDefaultTab,
     showTwoFactorSetup,

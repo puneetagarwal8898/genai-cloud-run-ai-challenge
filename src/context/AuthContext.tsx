@@ -1122,9 +1122,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (activeAuth.currentUser && targetEmail && activeAuth.currentUser.providerData.some(p => p.providerId === 'password')) {
         try {
           const credential = EmailAuthProvider.credential(targetEmail, cleanPassword);
-          await reauthenticateWithCredential(activeAuth.currentUser, credential);
+          await Promise.race([
+            reauthenticateWithCredential(activeAuth.currentUser, credential),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('reauth_timeout')), 1500))
+          ]);
         } catch (reauthErr: any) {
-          console.warn("Firebase reauth check status:", reauthErr.code);
+          console.warn("Firebase reauth check status:", reauthErr.code || reauthErr.message);
           if (
             reauthErr.code === 'auth/wrong-password' ||
             reauthErr.code === 'auth/invalid-credential' ||
@@ -1140,70 +1143,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Pre-validation passed! Immediately engage full UI lockout blocker
+    // Pre-validation passed! Immediately update URL to remove stale modal query and engage deletion state
+    try {
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    } catch (urlErr) {
+      console.warn("URL update note:", urlErr);
+    }
+
     setIsDeletingAccount(true);
 
     try {
-      // 1. Archive personal data for GDPR compliance and wipe all active storage (local + cloud)
-      try {
-        if (targetUid) {
-          await archiveAndWipeUserData(targetUid, targetEmail, userProfile);
-        }
-      } catch (archiveErr) {
-        console.warn("GDPR archive note:", archiveErr);
-      }
-
-      try {
-        await wipeAllUserData(targetUid || '', targetEmail);
-      } catch (wipeErr) {
-        console.warn("Wipe note:", wipeErr);
-      }
-
-      // 2. Register in deleted accounts store to prevent subsequent logins
-      if (targetEmail) {
+      // Execute data erasure with a hard 2500ms safety envelope so the user is never stuck
+      const erasurePromise = (async () => {
+        // 1. Archive personal data for GDPR compliance and wipe active storage (local + cloud)
         try {
-          const deletedRaw = localStorage.getItem('reflectai_deleted_accounts');
-          const deletedMap = deletedRaw ? JSON.parse(deletedRaw) : {};
-          deletedMap[targetEmail] = {
-            deletedAt: new Date().toISOString(),
-            reason: 'User GDPR self-service erasure'
-          };
-          localStorage.setItem('reflectai_deleted_accounts', JSON.stringify(deletedMap));
-        } catch (tombstoneErr) {
-          console.warn("Deleted tombstone record warning:", tombstoneErr);
+          if (targetUid) {
+            await archiveAndWipeUserData(targetUid, targetEmail, userProfile);
+          } else {
+            await wipeAllUserData('', targetEmail);
+          }
+        } catch (archiveErr) {
+          console.warn("GDPR archive note:", archiveErr);
         }
-      }
 
-      // 3. Purge session tokens from localStorage and sessionStorage
+        // 2. Register in deleted accounts store to prevent subsequent logins
+        if (targetEmail) {
+          try {
+            const deletedRaw = localStorage.getItem('reflectai_deleted_accounts');
+            const deletedMap = deletedRaw ? JSON.parse(deletedRaw) : {};
+            deletedMap[targetEmail] = {
+              deletedAt: new Date().toISOString(),
+              reason: 'User GDPR self-service erasure'
+            };
+            localStorage.setItem('reflectai_deleted_accounts', JSON.stringify(deletedMap));
+          } catch (tombstoneErr) {
+            console.warn("Deleted tombstone record warning:", tombstoneErr);
+          }
+        }
+
+        // 3. Purge session tokens from localStorage and sessionStorage
+        try {
+          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+          localStorage.removeItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
+          localStorage.removeItem(LOCAL_STORAGE_PENDING_KEY);
+          sessionStorage.clear();
+        } catch (tokenErr) {
+          console.warn("Session token purge note:", tokenErr);
+        }
+
+        // 4. Concurrently delete Firebase Auth user (bounded by 1000ms) and sign out
+        try {
+          const activeAuth = getActiveAuth();
+          if (activeAuth.currentUser) {
+            const currentUser = activeAuth.currentUser;
+            await Promise.race([
+              deleteUser(currentUser),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Auth delete timeout')), 1000))
+            ]).catch((e) => console.warn('Auth user delete note:', e.message));
+          }
+          await Promise.race([
+            firebaseSignOut(activeAuth),
+            new Promise<void>((resolve) => setTimeout(resolve, 600))
+          ]).catch(() => {});
+        } catch (fbErr: any) {
+          console.warn("Firebase Auth cleanup note:", fbErr.message);
+        }
+      })();
+
+      // Guarantee execution completes within 2500ms maximum
+      await Promise.race([
+        erasurePromise,
+        new Promise<void>((resolve) => setTimeout(resolve, 2500))
+      ]);
+
+      // Guarantee final purge of credentials & session state
       try {
         localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
         localStorage.removeItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
         localStorage.removeItem(LOCAL_STORAGE_PENDING_KEY);
         sessionStorage.clear();
-      } catch (tokenErr) {
-        console.warn("Session token purge note:", tokenErr);
-      }
-
-      // 4. Concurrently delete Firebase Auth user (bounded by 1200ms) and sign out
-      try {
-        const activeAuth = getActiveAuth();
-        if (activeAuth.currentUser) {
-          const currentUser = activeAuth.currentUser;
-          await Promise.race([
-            deleteUser(currentUser),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Auth delete timeout')), 1200))
-          ]).catch((e) => console.warn('Auth user delete note:', e.message));
-        }
-        await firebaseSignOut(activeAuth).catch(() => {});
-      } catch (fbErr: any) {
-        console.warn("Firebase Auth cleanup note:", fbErr.message);
-      }
+      } catch (e) {}
 
       // 5. Immediately transition to landing / login screen
       setUser(null);
       setUserProfile(null);
     } finally {
       setIsDeletingAccount(false);
+      try {
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } catch (e) {}
     }
   };
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -17,10 +17,28 @@ import { validateFirestoreConnection } from './firebase';
 
 function MainApp() {
   const { user, loading, isDeletingAccount, pendingTwoFactor, verifyAndCompleteTwoFactor, cancelTwoFactor } = useAuth();
+  const [showForceExit, setShowForceExit] = useState<boolean>(false);
 
   useEffect(() => {
     validateFirestoreConnection();
   }, []);
+
+  // Guarantee URL is cleaned as soon as account deletion begins
+  useEffect(() => {
+    let timer: any;
+    if (isDeletingAccount) {
+      if (typeof window !== 'undefined') {
+        try {
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch (e) {}
+      }
+      setShowForceExit(false);
+      timer = setTimeout(() => setShowForceExit(true), 3500);
+    } else {
+      setShowForceExit(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isDeletingAccount]);
 
   if (loading) {
     return (
@@ -70,17 +88,34 @@ function MainApp() {
               <Loader2 className="w-7 h-7 animate-spin text-rose-400" />
             </div>
             <div className="space-y-1.5">
-              <h3 className="text-lg font-semibold text-rose-100">Permanently Deleting Account</h3>
+              <h3 className="text-lg font-semibold text-stone-100">Deleting Your Account</h3>
               <p className="text-xs text-stone-400 leading-relaxed">
-                Securely wiping all reflections, encryption keys, and active user session. Please wait...
+                Securely erasing personal reflections, encryption keys, and active session.
               </p>
             </div>
             <div className="w-full bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div className="bg-rose-500 h-1.5 rounded-full animate-pulse w-full" />
             </div>
-            <p className="text-[11px] text-stone-500 font-mono tracking-wide">
-              UI locked &bull; Terminating session...
+            <p className="text-xs sm:text-sm font-medium text-stone-200">
+              Please stay on the screen while we delete your account.
             </p>
+            {showForceExit && (
+              <button
+                type="button"
+                id="force-exit-delete-btn"
+                onClick={() => {
+                  try {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.history.replaceState(null, '', window.location.pathname);
+                  } catch (e) {}
+                  window.location.reload();
+                }}
+                className="mt-2 px-3 py-1.5 rounded-lg border border-stone-700 bg-stone-800 hover:bg-stone-700 text-xs text-stone-300 transition cursor-pointer"
+              >
+                Finalize and Return to Home
+              </button>
+            )}
           </div>
         </div>
       )}

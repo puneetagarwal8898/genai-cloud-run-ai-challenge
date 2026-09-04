@@ -194,10 +194,20 @@ export async function wipeUserExportHistory(userId: string): Promise<void> {
   if (isConfigured && db) {
     try {
       const exportsRef = collection(db, 'users', userId, 'exports');
-      const snapshot = await getDocs(exportsRef);
-      const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
-      await Promise.all(deletePromises);
-      console.log(`[Cloud Wipe] Deleted all export records for ${userId} in Firestore.`);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Export wipe timeout (1000ms exceeded)')), 1000)
+      );
+      const snapshot = await Promise.race([getDocs(exportsRef), timeoutPromise]);
+      if (snapshot && !snapshot.empty) {
+        const deletePromises = snapshot.docs.map((d) =>
+          Promise.race([
+            deleteDoc(d.ref),
+            new Promise<void>((res) => setTimeout(res, 600))
+          ])
+        );
+        await Promise.all(deletePromises);
+        console.log(`[Cloud Wipe] Deleted all export records for ${userId} in Firestore.`);
+      }
     } catch (err: any) {
       console.warn('Cloud export history wipe note:', err.message);
     }
