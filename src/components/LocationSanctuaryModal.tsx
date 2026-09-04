@@ -7,7 +7,8 @@ import {
   Tag,
   Check,
   Loader2,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import L from 'leaflet';
@@ -24,6 +25,7 @@ interface LocationSanctuaryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLocationTagged: (location: SanctuaryLocation) => void;
+  onLocationRemoved?: () => void;
   existingLocation?: SanctuaryLocation;
   interactionsWithLocation?: JournalInteraction[];
   activeInteraction?: JournalInteraction | null;
@@ -399,6 +401,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
   isOpen,
   onClose,
   onLocationTagged,
+  onLocationRemoved,
   existingLocation,
   interactionsWithLocation = []
 }) => {
@@ -699,28 +702,45 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
         </div>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 text-xs opacity-70 hover:opacity-100 transition cursor-pointer"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          Cancel
-        </button>
-        <button
-          id="confirm-tag-location-button"
-          type="button"
-          onClick={handleApplyLocation}
-          className="px-5 py-2 rounded-xl text-xs font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-          style={{
-            backgroundColor: 'var(--accent)',
-            color: '#ffffff'
-          }}
-        >
-          <Tag className="w-3.5 h-3.5" />
-          Attach Location Tag
-        </button>
+      <div className="flex items-center justify-between gap-3 pt-2">
+        {existingLocation && onLocationRemoved ? (
+          <button
+            id="remove-location-tag-modal-btn"
+            type="button"
+            onClick={() => {
+              onLocationRemoved();
+              onClose();
+            }}
+            className="px-3 py-2 text-xs font-medium text-rose-500 hover:text-rose-600 transition cursor-pointer flex items-center gap-1.5 rounded-xl hover:bg-rose-500/10"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Remove Place
+          </button>
+        ) : <div />}
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs opacity-70 hover:opacity-100 transition cursor-pointer"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Cancel
+          </button>
+          <button
+            id="confirm-tag-location-button"
+            type="button"
+            onClick={handleApplyLocation}
+            className="px-5 py-2 rounded-xl text-xs font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: '#ffffff'
+            }}
+          >
+            <Tag className="w-3.5 h-3.5" />
+            {existingLocation ? 'Update Attached Place' : 'Attach Location Tag'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -768,10 +788,10 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
             </div>
             <div>
               <h3 className="font-semibold text-sm sm:text-base tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                Peaceful Places & Sanctuaries
+                {existingLocation ? 'Edit Attached Sanctuary Place' : 'Peaceful Places & Sanctuaries'}
               </h3>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Anchor your mindfulness reflections to soothing geography
+                {existingLocation ? 'Update the single tranquil place attached to this reflection' : 'Anchor your mindfulness reflections to soothing geography'}
               </p>
             </div>
           </div>

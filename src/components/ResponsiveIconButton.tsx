@@ -58,7 +58,7 @@ export const ResponsiveIconButton: React.FC<ResponsiveIconButtonProps> = ({
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const tooltipEstimatedWidth = 140;
+    const tooltipEstimatedWidth = Math.min(260, Math.max(150, label.length * 8.5));
     const placeAbove = rect.top > 80;
 
     const top = placeAbove ? rect.top - 8 : rect.bottom + 8;
@@ -73,7 +73,7 @@ export const ResponsiveIconButton: React.FC<ResponsiveIconButtonProps> = ({
       left: clampedLeft,
       placeAbove
     });
-  }, []);
+  }, [label]);
 
   const triggerShow = useCallback(() => {
     // Only show floating tooltip if text is hidden OR on mobile tap
@@ -129,6 +129,7 @@ export const ResponsiveIconButton: React.FC<ResponsiveIconButtonProps> = ({
         }}
         onMouseEnter={triggerShow}
         onMouseLeave={triggerHide}
+        onTouchStart={triggerShow}
         onFocus={triggerShow}
         onBlur={triggerHide}
         aria-label={fullAriaLabel}
@@ -145,7 +146,7 @@ export const ResponsiveIconButton: React.FC<ResponsiveIconButtonProps> = ({
       {!showText && showTooltip && coords && typeof document !== 'undefined' && createPortal(
         <div
           role="tooltip"
-          className="fixed z-9999 pointer-events-none px-2.5 py-1.5 rounded-xl shadow-xl text-xs font-medium backdrop-blur-md border animate-in fade-in zoom-in-95 duration-150 whitespace-nowrap text-center"
+          className="fixed z-9999 pointer-events-none px-3 py-2 rounded-xl shadow-xl text-xs font-medium backdrop-blur-md border animate-in fade-in zoom-in-95 duration-150 text-center max-w-[280px]"
           style={{
             top: `${coords.top}px`,
             left: `${coords.left}px`,
@@ -158,7 +159,7 @@ export const ResponsiveIconButton: React.FC<ResponsiveIconButtonProps> = ({
         >
           <div className="font-semibold leading-tight">{label}</div>
           {description && (
-            <div className="text-[10px] opacity-75 font-normal max-w-[200px] leading-tight mt-0.5 whitespace-normal">
+            <div className="text-[10px] opacity-75 font-normal leading-tight mt-0.5 whitespace-normal">
               {description}
             </div>
           )}

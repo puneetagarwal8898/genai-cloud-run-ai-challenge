@@ -28,7 +28,8 @@ import {
   Wand2,
   ChevronDown,
   Plus,
-  X
+  X,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -412,6 +413,7 @@ export const Dashboard: React.FC = () => {
     setActiveInteractionId(item.id);
     setTitle(item.title);
     setMode(item.mode);
+    setStagedLocation(item.location || null);
     setSuggestedPrompts(item.suggestedPrompts || getDefaultSuggestions(item.mode));
     if (item.trail && Array.isArray(item.trail) && item.trail.length > 0) {
       setConversationTrail(item.trail);
@@ -429,10 +431,32 @@ export const Dashboard: React.FC = () => {
     setTitle('');
     setPrompt('');
     setMode('reflection');
+    setStagedLocation(null);
     setConversationTrail([]);
     setSuggestedPrompts([]);
     setActionError(null);
     setStatusMessage(null);
+  };
+
+  const handleUpdateActiveReflectionLocation = async (loc: SanctuaryLocation | null) => {
+    if (!activeInteractionId || !user?.uid) return;
+    const currentList = [...interactions];
+    const idx = currentList.findIndex(i => i.id === activeInteractionId);
+    if (idx === -1) return;
+
+    const updated: JournalInteraction = {
+      ...currentList[idx],
+      location: loc || undefined,
+      updatedAt: new Date().toISOString()
+    };
+    currentList[idx] = updated;
+    setInteractions(currentList);
+    setStagedLocation(loc);
+    try {
+      await saveJournalInteraction(user.uid, updated);
+    } catch (err) {
+      console.warn("Error updating reflection location:", err);
+    }
   };
 
   const getDefaultSuggestions = (m: ReflectionMode): string[] => {
@@ -1611,18 +1635,24 @@ export const Dashboard: React.FC = () => {
                 return (
                   <div className="hidden sm:flex items-center gap-1.5">
                     {activeItem.location && (
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-medium"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStagedLocation(activeItem.location || null);
+                          setShowLocationModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-medium transition cursor-pointer hover:opacity-80"
                         style={{
                           backgroundColor: 'rgba(217, 119, 6, 0.08)',
                           borderColor: 'rgba(217, 119, 6, 0.3)',
                           color: '#d97706'
                         }}
-                        title={`Written at ${activeItem.location.placeName}`}
+                        title={`Attached Place: ${activeItem.location.placeName}. Click to edit or remove.`}
                       >
-                        <MapPin className="w-2.5 h-2.5" />
+                        <MapPin className="w-2.5 h-2.5 shrink-0" />
                         <span className="truncate max-w-[120px]">{activeItem.location.placeName}</span>
-                      </span>
+                        <Check className="w-2.5 h-2.5 shrink-0" />
+                      </button>
                     )}
                     {activeItem.timeCapsule && (
                       <span
@@ -1997,49 +2027,29 @@ export const Dashboard: React.FC = () => {
                         disabled={isSubmitting || isEmailUnverified}
                       />
 
-                      {/* Location-Aware Sanctuary Journey Tagger */}
-                      <div className="inline-flex items-center">
-                        <ResponsiveIconButton
-                          id="tag-location-btn"
-                          icon={<MapPin className="w-3.5 h-3.5 text-amber-500" />}
-                          label={stagedLocation ? stagedLocation.placeName : 'Tag Place'}
-                          description={stagedLocation ? `Location: ${stagedLocation.placeName}` : 'Tag a tranquil place where you wrote this reflection'}
-                          showText={showComposerActionLabels}
-                          active={!!stagedLocation}
-                          onClick={() => setShowLocationModal(true)}
-                          ariaLabel="Tag a tranquil place where you wrote this reflection"
-                          className={`px-2.5 py-1.5 border text-xs font-medium ${stagedLocation ? 'rounded-l-xl rounded-r-none border-r-0' : 'rounded-xl'}`}
-                          activeStyle={{
-                            backgroundColor: 'rgba(217, 119, 6, 0.12)',
-                            borderColor: '#d97706',
-                            color: '#d97706'
-                          }}
-                          inactiveStyle={{
-                            backgroundColor: 'var(--bg-card-elevated)',
-                            borderColor: 'var(--border-color)',
-                            color: 'var(--text-muted)'
-                          }}
-                        />
-                        {stagedLocation && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setStagedLocation(null);
-                            }}
-                            title="Remove tagged place"
-                            aria-label="Remove tagged place"
-                            className="px-1.5 py-1.5 rounded-r-xl border border-l-0 text-xs font-medium cursor-pointer transition hover:opacity-80"
-                            style={{
-                              backgroundColor: 'rgba(217, 119, 6, 0.12)',
-                              borderColor: '#d97706',
-                              color: '#d97706'
-                            }}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
+                      {/* Location-Aware Sanctuary Journey Tagger (single place per reflection) */}
+                      <ResponsiveIconButton
+                        id="tag-location-btn"
+                        icon={<MapPin className={`w-3.5 h-3.5 ${stagedLocation ? 'text-amber-500' : 'text-stone-400 dark:text-stone-500'}`} />}
+                        badge={stagedLocation ? <Check className="w-3.5 h-3.5 text-amber-500 stroke-[2.5] shrink-0" /> : undefined}
+                        label={stagedLocation ? stagedLocation.placeName : 'Tag Place'}
+                        description={stagedLocation ? 'Attached sanctuary place • Hover or tap to see location, click to edit' : 'Tag a tranquil place where you wrote this reflection'}
+                        showText={false}
+                        active={!!stagedLocation}
+                        onClick={() => setShowLocationModal(true)}
+                        ariaLabel={stagedLocation ? `Attached place: ${stagedLocation.placeName}. Click to edit.` : 'Tag a tranquil place where you wrote this reflection'}
+                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium cursor-pointer transition-all shrink-0"
+                        activeStyle={{
+                          backgroundColor: 'rgba(217, 119, 6, 0.12)',
+                          borderColor: '#d97706',
+                          color: '#d97706'
+                        }}
+                        inactiveStyle={{
+                          backgroundColor: 'var(--bg-card-elevated)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-muted)'
+                        }}
+                      />
 
                       {/* Serenity Time Capsule Seal shortcut */}
                       <ResponsiveIconButton
@@ -2278,9 +2288,21 @@ export const Dashboard: React.FC = () => {
       <LocationSanctuaryModal
         isOpen={showLocationModal}
         onClose={() => setShowLocationModal(false)}
+        existingLocation={stagedLocation || undefined}
         activeInteraction={interactions.find(i => i.id === activeInteractionId) || null}
         interactionsWithLocation={interactions.filter(i => !!i.location)}
-        onLocationTagged={(loc) => setStagedLocation(loc)}
+        onLocationTagged={(loc) => {
+          setStagedLocation(loc);
+          if (activeInteractionId) {
+            handleUpdateActiveReflectionLocation(loc);
+          }
+        }}
+        onLocationRemoved={() => {
+          setStagedLocation(null);
+          if (activeInteractionId) {
+            handleUpdateActiveReflectionLocation(null);
+          }
+        }}
       />
 
       {/* About & FAQ Modal */}
