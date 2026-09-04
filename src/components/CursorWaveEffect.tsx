@@ -24,7 +24,8 @@ export const CursorWaveEffect: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animationFrameId: number;
+    let animationFrameId: number | null = null;
+    let isLoopRunning = false;
     const ripples: Ripple[] = [];
     let lastX = -100;
     let lastY = -100;
@@ -42,6 +43,13 @@ export const CursorWaveEffect: React.FC = () => {
     resize();
     window.addEventListener('resize', resize);
 
+    const startLoopIfNeeded = () => {
+      if (!isLoopRunning) {
+        isLoopRunning = true;
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+
     const addRipple = (x: number, y: number, isClick = false) => {
       ripples.push({
         x,
@@ -53,17 +61,18 @@ export const CursorWaveEffect: React.FC = () => {
         growthRate: isClick ? 1.4 : 0.95
       });
       // Cap max concurrent ripples for maximum performance
-      if (ripples.length > 25) {
+      if (ripples.length > 20) {
         ripples.shift();
       }
+      startLoopIfNeeded();
     };
 
     const handlePointerMove = (e: PointerEvent) => {
       const now = performance.now();
       const dist = Math.hypot(e.clientX - lastX, e.clientY - lastY);
 
-      // Trigger wave if moved sufficiently and throttled
-      if (dist > 18 && now - lastTime > 30) {
+      // Trigger wave if moved sufficiently and throttled to prevent spamming
+      if (dist > 24 && now - lastTime > 40) {
         lastX = e.clientX;
         lastY = e.clientY;
         lastTime = now;
@@ -90,6 +99,13 @@ export const CursorWaveEffect: React.FC = () => {
     };
 
     const render = () => {
+      if (ripples.length === 0) {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        isLoopRunning = false;
+        animationFrameId = null;
+        return;
+      }
+
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       const color = hexToRgb(themeRef.current.accentHex || '#6366f1');
@@ -126,13 +142,19 @@ export const CursorWaveEffect: React.FC = () => {
         ctx.restore();
       }
 
-      animationFrameId = requestAnimationFrame(render);
+      if (ripples.length > 0) {
+        animationFrameId = requestAnimationFrame(render);
+      } else {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        isLoopRunning = false;
+        animationFrameId = null;
+      }
     };
 
-    render();
-
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
       window.removeEventListener('resize', resize);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerdown', handlePointerDown);

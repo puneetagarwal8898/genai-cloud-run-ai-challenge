@@ -119,32 +119,43 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
 
     setIsExporting(true);
 
-    try {
-      // Generate and download password-encrypted PDF
-      const result = exportReflectionsToPdf(interactions, userProfile, cleanFilePassword);
+    // Yield control briefly to ensure the DOM paints the loading state and spinner
+    setTimeout(async () => {
+      try {
+        // Generate and download password-encrypted PDF
+        const result = exportReflectionsToPdf(interactions, userProfile, cleanFilePassword);
 
-      // Record download history
-      if (userProfile?.uid) {
-        await recordExportDownload(userProfile.uid, {
-          fileName: result.fileName,
-          filePassword: cleanFilePassword,
-          downloadedAt: result.downloadedAt,
-          entriesCount: result.entriesCount,
-          fileSizeFormatted: result.fileSizeFormatted,
-          securityMethod: result.securityMethod
-        });
+        // Record download history (fast local save + non-blocking cloud write)
+        if (userProfile?.uid) {
+          await recordExportDownload(userProfile.uid, {
+            fileName: result.fileName,
+            filePassword: cleanFilePassword,
+            downloadedAt: result.downloadedAt,
+            entriesCount: result.entriesCount,
+            fileSizeFormatted: result.fileSizeFormatted,
+            securityMethod: result.securityMethod
+          });
+        }
+
+        setRefreshHistory((prev) => prev + 1);
+        setSuccess(true);
+        setIsExporting(false);
+
+        // Brief delay for visual confirmation before seamlessly returning to Settings
+        setTimeout(() => {
+          onExportSuccess?.();
+          onClose();
+          setFilePassword('');
+          setAccountPassword('');
+          setTotpCode('');
+          setSuccess(false);
+        }, 350);
+      } catch (err: any) {
+        console.error('PDF export error:', err);
+        setError('Failed to generate encrypted PDF. Please try again.');
+        setIsExporting(false);
       }
-
-      setRefreshHistory((prev) => prev + 1);
-      setSuccess(true);
-      setIsExporting(false);
-      onExportSuccess?.();
-      onClose();
-    } catch (err: any) {
-      console.error('PDF export error:', err);
-      setError('Failed to generate encrypted PDF. Please try again.');
-      setIsExporting(false);
-    }
+    }, 60);
   };
 
   return (

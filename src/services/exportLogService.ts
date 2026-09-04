@@ -13,24 +13,41 @@ import { sanitizePayload } from './journalService';
 
 const LOCAL_STORAGE_EXPORTS_KEY_PREFIX = 'reflectai_exports_';
 
+// Retention duration: 1 full year (365 days)
+export const EXPORT_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
+
 // In-memory cache for fast local responsiveness
 const memoryExportCache = new Map<string, ExportDownloadRecord[]>();
 
 /**
- * Returns the download history for a user from memory/localStorage.
+ * Validates if an export record is within the 1-year retention window.
+ */
+function isWithinOneYear(downloadedAt: string): boolean {
+  if (!downloadedAt) return false;
+  const timestamp = new Date(downloadedAt).getTime();
+  if (isNaN(timestamp)) return true; // Keep if unparseable
+  return Date.now() - timestamp <= EXPORT_HISTORY_RETENTION_MS;
+}
+
+/**
+ * Returns the download history for a user from memory/localStorage retained within 1 year.
  */
 export function getCachedExportHistory(userId: string): ExportDownloadRecord[] {
   if (!userId) return [];
   if (memoryExportCache.has(userId)) {
-    return memoryExportCache.get(userId) || [];
+    const cached = memoryExportCache.get(userId) || [];
+    return cached.filter((item) => isWithinOneYear(item.downloadedAt));
   }
   const key = `${LOCAL_STORAGE_EXPORTS_KEY_PREFIX}${userId}`;
   try {
     const localRaw = localStorage.getItem(key);
     if (localRaw) {
       const parsed: ExportDownloadRecord[] = JSON.parse(localRaw);
-      memoryExportCache.set(userId, parsed);
-      return parsed;
+      const activeRecords = Array.isArray(parsed)
+        ? parsed.filter((item) => isWithinOneYear(item.downloadedAt))
+        : [];
+      memoryExportCache.set(userId, activeRecords);
+      return activeRecords;
     }
   } catch (err) {
     console.warn('Error reading local export cache:', err);
@@ -39,7 +56,8 @@ export function getCachedExportHistory(userId: string): ExportDownloadRecord[] {
 }
 
 /**
- * Loads export records from Firestore and synchronizes with local storage.
+ * Loads export records from Firestore and synchronizes with local storage,
+ * preserving up to 1 year of download history.
  */
 export async function fetchExportHistory(userId: string): Promise<ExportDownloadRecord[]> {
   if (!userId) return [];
@@ -60,24 +78,41 @@ export async function fetchExportHistory(userId: string): Promise<ExportDownload
     const cloudRecords: ExportDownloadRecord[] = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
-      cloudRecords.push({
-        id: docSnap.id,
-        fileName: data.fileName || 'ReflectAI-Reflections.pdf',
-        filePassword: data.filePassword || undefined,
-        downloadedAt: data.downloadedAt || new Date().toISOString(),
-        entriesCount: typeof data.entriesCount === 'number' ? data.entriesCount : 0,
-        fileSizeBytes: data.fileSizeBytes,
-        fileSizeFormatted: data.fileSizeFormatted,
-        securityMethod: data.securityMethod || 'Standard Encrypted'
-      });
+      const downloadedAt = data.downloadedAt || new Date().toISOString();
+      if (isWithinOneYear(downloadedAt)) {
+        cloudRecords.push({
+          id: docSnap.id,
+          fileName: data.fileName || 'ReflectAI-Reflections.pdf',
+          filePassword: data.filePassword || undefined,
+          downloadedAt,
+          entriesCount: typeof data.entriesCount === 'number' ? data.entriesCount : 0,
+          fileSizeBytes: data.fileSizeBytes,
+          fileSizeFormatted: data.fileSizeFormatted,
+          securityMethod: data.securityMethod || 'Standard Encrypted'
+        });
+      }
     });
 
-    if (cloudRecords.length > 0) {
-      memoryExportCache.set(userId, cloudRecords);
-      localStorage.setItem(`${LOCAL_STORAGE_EXPORTS_KEY_PREFIX}${userId}`, JSON.stringify(cloudRecords));
-      return cloudRecords;
+    // Merge cloud records and cached records by ID to never lose local entries
+    const recordMap = new Map<string, ExportDownloadRecord>();
+    cloudRecords.forEach((rec) => recordMap.set(rec.id, rec));
+    cached.forEach((rec) => {
+      if (!recordMap.has(rec.id)) {
+        recordMap.set(rec.id, rec);
+      }
+    });
+
+    const mergedRecords = Array.from(recordMap.values())
+      .filter((rec) => isWithinOneYear(rec.downloadedAt))
+      .sort((a, b) => new Date(b.downloadedAt).getTime() - new Date(a.downloadedAt).getTime());
+
+    memoryExportCache.set(userId, mergedRecords);
+    try {
+      localStorage.setItem(`${LOCAL_STORAGE_EXPORTS_KEY_PREFIX}${userId}`, JSON.stringify(mergedRecords));
+    } catch (e) {
+      console.warn('Failed to cache merged exports to localStorage:', e);
     }
-    return cached;
+    return mergedRecords;
   } catch (err: any) {
     console.warn('Firestore exports fetch note (using local cache):', err.message);
     return cached;
@@ -86,6 +121,7 @@ export async function fetchExportHistory(userId: string): Promise<ExportDownload
 
 /**
  * Records a new PDF export download both locally and in Firestore.
+ * Local save and event dispatching are instantaneous; Firestore sync is non-blocking.
  */
 export async function recordExportDownload(
   userId: string,
@@ -97,9 +133,10 @@ export async function recordExportDownload(
     id: recordId
   };
 
-  // 1. Update local cache
+  // 1. Update local cache immediately
   const existing = getCachedExportHistory(userId);
-  const updated = [fullRecord, ...existing.filter((item) => item.id !== recordId)];
+  const updated = [fullRecord, ...existing.filter((item) => item.id !== recordId)]
+    .filter((item) => isWithinOneYear(item.downloadedAt));
   memoryExportCache.set(userId, updated);
   try {
     localStorage.setItem(`${LOCAL_STORAGE_EXPORTS_KEY_PREFIX}${userId}`, JSON.stringify(updated));
@@ -107,25 +144,32 @@ export async function recordExportDownload(
     console.warn('Failed to save export to localStorage:', e);
   }
 
-  // 2. Persist to Firestore if online & configured
-  const { isConfigured } = getFirebaseCredentialsStatus();
-  if (isConfigured && db) {
-    try {
-      const exportDocRef = doc(db, 'users', userId, 'exports', recordId);
-      const cleanPayload = sanitizePayload(fullRecord);
-      await setDoc(exportDocRef, cleanPayload);
-    } catch (err: any) {
-      console.warn('Firestore export record write note:', err.message);
-    }
-  }
-
-  // 3. Dispatch global event to instantly notify listeners (e.g. ExportDownloadHistory components)
+  // 2. Dispatch global event immediately so UI listeners (e.g. ExportDownloadHistory) update instantly
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('reflectai_export_recorded', {
         detail: { userId, record: fullRecord }
       })
     );
+  }
+
+  // 3. Persist to Firestore asynchronously in the background with a 3-second safety boundary
+  const { isConfigured } = getFirebaseCredentialsStatus();
+  if (isConfigured && db) {
+    const saveToFirestore = async () => {
+      try {
+        const exportDocRef = doc(db, 'users', userId, 'exports', recordId);
+        const cleanPayload = sanitizePayload(fullRecord);
+        await setDoc(exportDocRef, cleanPayload);
+      } catch (err: any) {
+        console.warn('Firestore export record write background note:', err.message);
+      }
+    };
+    // Fire with safety race so it never halts execution
+    Promise.race([
+      saveToFirestore(),
+      new Promise((resolve) => setTimeout(resolve, 3000))
+    ]).catch((e) => console.warn('Firestore background write timeout:', e));
   }
 
   return fullRecord;

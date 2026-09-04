@@ -13,6 +13,29 @@ export interface VoiceProfile {
 
 export const CURATED_VOICES: VoiceProfile[] = [
   {
+    id: 'female-celeste',
+    name: 'Celeste',
+    gender: 'female',
+    tone: 'Soft, Warm & Tranquil',
+    accent: 'Natural Cadence / Mindful & Velvety',
+    description: 'A beautifully natural, velvety female voice with an unhurried, restorative presence designed for deep calm, gentle clarity, and total peaceful relaxation.',
+    keywords: [
+      'natural',
+      'neural',
+      'ava',
+      'jenny',
+      'samantha',
+      'allison',
+      'libby',
+      'moira',
+      'claire',
+      'google us english'
+    ],
+    defaultRate: 0.88,
+    defaultPitch: 1.0,
+    sampleText: 'Breathe in gentle stillness, and let every tension melt away. You are safe, relaxed, and fully present in this quiet sanctuary.'
+  },
+  {
     id: 'female-serena',
     name: 'Serena',
     gender: 'female',
@@ -33,27 +56,25 @@ export const CURATED_VOICES: VoiceProfile[] = [
     sampleText: 'Welcome to your morning sanctuary. Take a gentle breath, soften your posture, and let your thoughts rest in quiet comfort.'
   },
   {
-    id: 'female-celeste',
-    name: 'Celeste',
+    id: 'female-elena',
+    name: 'Elena',
     gender: 'female',
-    tone: 'Soft, Warm & Tranquil',
-    accent: 'Gentle Natural Cadence / Deep Relaxation',
-    description: 'A beautifully natural, velvety female voice with an unhurried, restorative presence designed for deep calm, gentle clarity, and total peaceful relaxation.',
+    tone: 'Bright & Mindful',
+    accent: 'Natural Pacific / Warm & Clear',
+    description: 'An uplifting, organic voice characterized by gentle intonation and clarity, perfect for cultivating gratitude and mental presence.',
     keywords: [
+      'elena',
       'natural',
-      'neural',
-      'ava',
-      'jenny',
-      'samantha',
-      'allison',
-      'libby',
-      'moira',
-      'claire',
-      'google us english'
+      'karen',
+      'fiona',
+      'tessa',
+      'aria',
+      'siri',
+      'google'
     ],
-    defaultRate: 0.84,
-    defaultPitch: 0.98,
-    sampleText: 'Breathe in gentle stillness, and let every tension melt away. You are safe, relaxed, and fully present in this quiet sanctuary.'
+    defaultRate: 0.90,
+    defaultPitch: 1.04,
+    sampleText: 'Notice this present moment just as it is. Allow gratitude to soften your heart and bring lightness to your day.'
   },
   {
     id: 'male-julian',
@@ -94,6 +115,25 @@ export const CURATED_VOICES: VoiceProfile[] = [
     defaultRate: 0.80,
     defaultPitch: 0.72,
     sampleText: 'Release the weight of this day. You are safe here in this quiet hour. Rest your mind in complete and effortless peace.'
+  },
+  {
+    id: 'male-oliver',
+    name: 'Oliver',
+    gender: 'male',
+    tone: 'Calm & Reflective',
+    accent: 'Gentle Tenor / Restorative',
+    description: 'A smooth, gentle tenor voice with an empathetic tone, guiding you through reflective journaling with ease.',
+    keywords: [
+      'oliver',
+      'natural',
+      'neural',
+      'guy',
+      'ryan',
+      'google'
+    ],
+    defaultRate: 0.88,
+    defaultPitch: 0.96,
+    sampleText: 'Allow your thoughts to flow freely onto the page. Every feeling you experience is worthy of gentle reflection.'
   }
 ];
 
@@ -244,6 +284,15 @@ export function resolveSpeechVoice(
     if (notMale) return notMale;
   }
 
+  if (matchedProfile?.id === 'female-elena') {
+    const clearFemale = femaleVoices.find((v) =>
+      /elena|karen|tessa|fiona|siri|aria/i.test(v.name) &&
+      !/zira|desktop|espeak/i.test(v.name)
+    );
+    if (clearFemale) return clearFemale;
+    if (femaleVoices.length > 0) return femaleVoices[0];
+  }
+
   if (matchedProfile?.id === 'male-julian') {
     // 1. British / UK male
     const ukMale = maleVoices.find((v) =>
@@ -276,6 +325,15 @@ export function resolveSpeechVoice(
     // 3. Fallback
     const notFemale = voices.find((v) => !isVoiceFemale(v));
     if (notFemale) return notFemale;
+  }
+
+  if (matchedProfile?.id === 'male-oliver') {
+    const tenorMale = maleVoices.find((v) =>
+      /oliver|ryan|guy|christopher|daniel/i.test(v.name) &&
+      !/desktop|espeak/i.test(v.name)
+    );
+    if (tenorMale) return tenorMale;
+    if (maleVoices.length > 0) return maleVoices[0];
   }
 
   // Generic gender fallback
@@ -377,4 +435,117 @@ export function previewVoice(
   }
 
   window.speechSynthesis.speak(utterance);
+}
+
+// ==========================================
+// 432Hz Ambient Sound Synthesis & Preview
+// ==========================================
+
+let ambientAudioCtx: AudioContext | null = null;
+let ambientOscNode: OscillatorNode | null = null;
+let ambientGainNode: GainNode | null = null;
+let ambientTimer: any = null;
+
+/**
+ * Checks if 432Hz ambient preview is currently playing.
+ */
+export function is432HzPreviewPlaying(): boolean {
+  return ambientOscNode !== null;
+}
+
+/**
+ * Stops the 432Hz ambient sound preview gracefully with a soft audio fade-out.
+ */
+export function stop432HzPreview(): void {
+  if (ambientTimer) {
+    clearTimeout(ambientTimer);
+    ambientTimer = null;
+  }
+  if (ambientGainNode && ambientAudioCtx) {
+    try {
+      const now = ambientAudioCtx.currentTime;
+      ambientGainNode.gain.cancelScheduledValues(now);
+      ambientGainNode.gain.setValueAtTime(ambientGainNode.gain.value, now);
+      ambientGainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.4);
+    } catch (e) {
+      // Ignored
+    }
+  }
+  setTimeout(() => {
+    try {
+      if (ambientOscNode) {
+        ambientOscNode.stop();
+        ambientOscNode.disconnect();
+        ambientOscNode = null;
+      }
+      if (ambientGainNode) {
+        ambientGainNode.disconnect();
+        ambientGainNode = null;
+      }
+    } catch (e) {
+      // Ignored
+    }
+  }, 450);
+}
+
+/**
+ * Plays a soothing 432Hz sine tone with organic lowpass harmonics for previewing.
+ * Auto-fades after 7 seconds or when stopped.
+ */
+export function play432HzPreview(onEnd?: () => void): void {
+  stop432HzPreview();
+
+  if (typeof window === 'undefined') {
+    onEnd?.();
+    return;
+  }
+
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) {
+      onEnd?.();
+      return;
+    }
+
+    if (!ambientAudioCtx) {
+      ambientAudioCtx = new AudioCtx();
+    }
+
+    if (ambientAudioCtx.state === 'suspended') {
+      ambientAudioCtx.resume();
+    }
+
+    const osc = ambientAudioCtx.createOscillator();
+    const filter = ambientAudioCtx.createBiquadFilter();
+    const gain = ambientAudioCtx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(432, ambientAudioCtx.currentTime); // 432 Hz Calming harmonic
+
+    // Warm, soft acoustic lowpass filter
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(750, ambientAudioCtx.currentTime);
+
+    // Soft organic volume envelope
+    const now = ambientAudioCtx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.038, now + 1.0);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ambientAudioCtx.destination);
+
+    osc.start();
+    ambientOscNode = osc;
+    ambientGainNode = gain;
+
+    // Auto fade-out after 7 seconds
+    ambientTimer = setTimeout(() => {
+      stop432HzPreview();
+      onEnd?.();
+    }, 7000);
+  } catch (err) {
+    console.warn('432Hz preview audio note:', err);
+    onEnd?.();
+  }
 }

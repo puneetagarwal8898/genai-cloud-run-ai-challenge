@@ -104,6 +104,7 @@ export const Dashboard: React.FC = () => {
 
   // Standout Feature Modals & Staging
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [settingsDefaultTab, setSettingsDefaultTab] = useState<'profile' | 'preferences' | 'security'>('profile');
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState<boolean>(false);
   const [showExportPdfModal, setShowExportPdfModal] = useState<boolean>(false);
   const [showResonanceMap, setShowResonanceMap] = useState<boolean>(false);
@@ -118,6 +119,112 @@ export const Dashboard: React.FC = () => {
   const mobileEnhancementsRef = useRef<HTMLDivElement | null>(null);
   const [showMobileProfileMenu, setShowMobileProfileMenu] = useState<boolean>(false);
   const mobileProfileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Helper to sync modal state to URL query parameters without full page reloads
+  const syncModalUrl = (modalName: string | null, tabName?: string | null) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      if (modalName) {
+        url.searchParams.set('modal', modalName);
+        if (tabName) {
+          url.searchParams.set('tab', tabName);
+        } else {
+          url.searchParams.delete('tab');
+        }
+      } else {
+        url.searchParams.delete('modal');
+        url.searchParams.delete('tab');
+      }
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    } catch (e) {
+      // URL manipulation fallback
+    }
+  };
+
+  // Restore and synchronize modal state from URL on initial load and browser back/forward navigation
+  useEffect(() => {
+    const handleUrlModalState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const modal = params.get('modal');
+        const tab = params.get('tab');
+
+        if (modal === 'settings') {
+          if (tab === 'preferences' || tab === 'security' || tab === 'profile') {
+            setSettingsDefaultTab(tab);
+          }
+          setShowSettingsModal(true);
+        } else if (modal === 'export-pdf') {
+          setSettingsDefaultTab('security');
+          setShowExportPdfModal(true);
+        } else if (modal === '2fa-setup') {
+          setSettingsDefaultTab('security');
+          setShowTwoFactorSetup(true);
+        } else if (modal === 'about') {
+          setShowAboutModal(true);
+        } else if (modal === 'legal') {
+          if (tab === 'terms' || tab === 'privacy') {
+            setLegalModalTab(tab);
+          }
+          setShowLegalModal(true);
+        } else if (modal === 'resonance') {
+          setShowResonanceMap(true);
+        } else if (modal === 'timecapsule') {
+          setShowTimeCapsule(true);
+        } else if (modal === 'location') {
+          setShowLocationModal(true);
+        } else if (modal === 'verify') {
+          setShowVerifyModal(true);
+        }
+      } catch (e) {
+        // Safe fallback
+      }
+    };
+
+    handleUrlModalState();
+    window.addEventListener('popstate', handleUrlModalState);
+    return () => {
+      window.removeEventListener('popstate', handleUrlModalState);
+    };
+  }, []);
+
+  // Synchronize modal state changes into the active browser URL
+  useEffect(() => {
+    if (showExportPdfModal) {
+      syncModalUrl('export-pdf');
+    } else if (showTwoFactorSetup) {
+      syncModalUrl('2fa-setup');
+    } else if (showSettingsModal) {
+      syncModalUrl('settings', settingsDefaultTab);
+    } else if (showAboutModal) {
+      syncModalUrl('about');
+    } else if (showLegalModal) {
+      syncModalUrl('legal', legalModalTab);
+    } else if (showResonanceMap) {
+      syncModalUrl('resonance');
+    } else if (showTimeCapsule) {
+      syncModalUrl('timecapsule');
+    } else if (showLocationModal) {
+      syncModalUrl('location');
+    } else if (showVerifyModal) {
+      syncModalUrl('verify');
+    } else {
+      syncModalUrl(null);
+    }
+  }, [
+    showSettingsModal,
+    settingsDefaultTab,
+    showTwoFactorSetup,
+    showExportPdfModal,
+    showResonanceMap,
+    showTimeCapsule,
+    showLocationModal,
+    showAboutModal,
+    showLegalModal,
+    legalModalTab,
+    showVerifyModal
+  ]);
 
   // Close mobile profile dropdown menu on outside click or Escape
   useEffect(() => {
@@ -2071,6 +2178,8 @@ export const Dashboard: React.FC = () => {
       {/* Standout Feature 1: Account Settings & Preferences Modal */}
       <SettingsModal
         isOpen={showSettingsModal}
+        defaultTab={settingsDefaultTab}
+        onTabChange={(tab) => setSettingsDefaultTab(tab)}
         onClose={() => setShowSettingsModal(false)}
         onOpenAbout={() => {
           setNavigatedFromSettings(true);
@@ -2084,9 +2193,11 @@ export const Dashboard: React.FC = () => {
           setShowLegalModal(true);
         }}
         onOpenTwoFactorSetup={() => {
+          setSettingsDefaultTab('security');
           setShowTwoFactorSetup(true);
         }}
         onOpenExportPdf={() => {
+          setSettingsDefaultTab('security');
           setShowExportPdfModal(true);
         }}
       />
@@ -2095,10 +2206,16 @@ export const Dashboard: React.FC = () => {
       <TwoFactorSetupModal
         isOpen={showTwoFactorSetup}
         userEmail={userProfile?.email || user?.email || 'reflector@reflectai.internal'}
-        onClose={() => setShowTwoFactorSetup(false)}
+        onClose={() => {
+          setShowTwoFactorSetup(false);
+          setShowSettingsModal(true);
+          setSettingsDefaultTab('security');
+        }}
         onSuccess={async (secret) => {
           await enableTwoFactorAuth(secret);
           setShowTwoFactorSetup(false);
+          setShowSettingsModal(true);
+          setSettingsDefaultTab('security');
           setStatusMessage('Two-Factor Authentication successfully enabled! Your reflections are now protected.');
         }}
       />
@@ -2106,7 +2223,11 @@ export const Dashboard: React.FC = () => {
       {/* PDF Reflection Export Modal */}
       <ExportPdfModal
         isOpen={showExportPdfModal}
-        onClose={() => setShowExportPdfModal(false)}
+        onClose={() => {
+          setShowExportPdfModal(false);
+          setShowSettingsModal(true);
+          setSettingsDefaultTab('security');
+        }}
         interactions={interactions}
         userProfile={userProfile}
         onOpenTwoFactorSetup={() => {

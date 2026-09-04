@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   User,
@@ -18,17 +18,29 @@ import {
   FileText,
   CheckCircle2,
   Play,
-  Square
+  Square,
+  Radio
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { CURATED_VOICES, resolveSpeechVoice, previewVoice, stopVoicePreview, VoiceProfile } from '../utils/voiceUtils';
+import {
+  CURATED_VOICES,
+  resolveSpeechVoice,
+  previewVoice,
+  stopVoicePreview,
+  play432HzPreview,
+  stop432HzPreview,
+  is432HzPreviewPlaying,
+  VoiceProfile
+} from '../utils/voiceUtils';
 import { verifyTotpToken } from '../utils/totp';
 import { ExportDownloadHistory } from './ExportDownloadHistory';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultTab?: 'profile' | 'preferences' | 'security';
+  onTabChange?: (tab: 'profile' | 'preferences' | 'security') => void;
   onOpenAbout?: () => void;
   onOpenLegal?: () => void;
   onOpenTwoFactorSetup?: () => void;
@@ -47,6 +59,8 @@ const MINDFUL_AVATARS = [
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  defaultTab = 'profile',
+  onTabChange,
   onOpenAbout,
   onOpenLegal,
   onOpenTwoFactorSetup,
@@ -61,7 +75,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     disableTwoFactorAuth
   } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security'>(defaultTab);
+
+  const switchTab = (tab: 'profile' | 'preferences' | 'security') => {
+    setActiveTab(tab);
+    onTabChange?.(tab);
+  };
 
   // Profile fields
   const [displayName, setDisplayName] = useState(userProfile?.displayName || user?.displayName || '');
@@ -70,7 +89,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Preference fields
   const [ambientSound, setAmbientSound] = useState(userProfile?.preferences?.ambientSound ?? userProfile?.preferences?.ambientSoundEnabled ?? true);
-  const [voiceRate, setVoiceRate] = useState(userProfile?.preferences?.voiceRate ?? userProfile?.preferences?.voiceSpeed ?? 0.95);
+  const [isPlaying432Hz, setIsPlaying432Hz] = useState(false);
+  const [voiceRate, setVoiceRate] = useState(userProfile?.preferences?.voiceRate ?? userProfile?.preferences?.voiceSpeed ?? 0.88);
   const [voicePitch, setVoicePitch] = useState(userProfile?.preferences?.voicePitch || 1.0);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(() => {
     const rawId = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
@@ -78,6 +98,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return rawId || CURATED_VOICES[0].id;
   });
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const debounceSliderTimerRef = useRef<any>(null);
 
   // States
   const [isSaving, setIsSaving] = useState(false);
@@ -105,13 +126,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Reset state whenever modal is opened
   React.useEffect(() => {
     if (isOpen) {
-      setActiveTab('profile');
+      setActiveTab(defaultTab);
       setDisplayName(userProfile?.displayName || user?.displayName || '');
       setSelectedAvatar(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
       setCustomAvatarUrl('');
       const rawVoice = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
       setSelectedVoiceId(rawVoice === 'female-aria' || rawVoice === 'aria' ? 'female-celeste' : (rawVoice || CURATED_VOICES[0].id));
       setPreviewingVoiceId(null);
+      setIsPlaying432Hz(false);
       setTwoFactorNotice(null);
       setSaveSuccess(false);
       setSaveError(null);
@@ -120,14 +142,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setDeletePassword('');
       setDeleteError(null);
     }
-  }, [isOpen, userProfile, user]);
+  }, [isOpen, defaultTab, userProfile, user]);
 
-  // Handle Escape key
+  // Handle Escape key & cleanup
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && !isDeleting) {
         stopVoicePreview();
+        stop432HzPreview();
         setPreviewingVoiceId(null);
+        setIsPlaying432Hz(false);
         onClose();
       }
     };
@@ -137,18 +161,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       stopVoicePreview();
+      stop432HzPreview();
     };
   }, [isOpen, onClose, isDeleting]);
 
-  // Stop voice preview when switching tabs
+  // Stop sound previews when switching tabs
   React.useEffect(() => {
     stopVoicePreview();
+    stop432HzPreview();
     setPreviewingVoiceId(null);
+    setIsPlaying432Hz(false);
   }, [activeTab]);
 
   if (!isOpen) return null;
 
-  const handlePreviewVoice = (voiceProfile: VoiceProfile) => {
+  const handleToggle432HzPreview = () => {
+    if (isPlaying432Hz) {
+      stop432HzPreview();
+      setIsPlaying432Hz(false);
+    } else {
+      stopVoicePreview();
+      setPreviewingVoiceId(null);
+      setIsPlaying432Hz(true);
+      play432HzPreview(() => {
+        setIsPlaying432Hz(false);
+      });
+    }
+  };
+
+  const handlePreviewVoice = (voiceProfile: VoiceProfile, overrideRate?: number, overridePitch?: number) => {
+    if (isPlaying432Hz) {
+      stop432HzPreview();
+      setIsPlaying432Hz(false);
+    }
+
     if (previewingVoiceId === voiceProfile.id) {
       stopVoicePreview();
       setPreviewingVoiceId(null);
@@ -159,18 +205,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const resolved = resolveSpeechVoice(voiceProfile.id, voiceProfile.gender);
     previewVoice(
       resolved,
-      voiceRate || voiceProfile.defaultRate,
-      voicePitch || voiceProfile.defaultPitch,
+      overrideRate !== undefined ? overrideRate : (voiceRate || voiceProfile.defaultRate),
+      overridePitch !== undefined ? overridePitch : (voicePitch || voiceProfile.defaultPitch),
       () => {
-        // onStart: ensure UI reflects active playing state with stop icon
         setPreviewingVoiceId(voiceProfile.id);
       },
       () => {
-        // onEnd: return to play sample icon when speech finishes
         setPreviewingVoiceId(null);
       },
       voiceProfile.sampleText
     );
+  };
+
+  // Live audition when adjusting sliders
+  const handleRateChange = (newRate: number) => {
+    setVoiceRate(newRate);
+    if (previewingVoiceId) {
+      if (debounceSliderTimerRef.current) clearTimeout(debounceSliderTimerRef.current);
+      debounceSliderTimerRef.current = setTimeout(() => {
+        const activeVoice = CURATED_VOICES.find(v => v.id === previewingVoiceId) || CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+        handlePreviewVoice(activeVoice, newRate, voicePitch);
+      }, 160);
+    }
+  };
+
+  const handlePitchChange = (newPitch: number) => {
+    setVoicePitch(newPitch);
+    if (previewingVoiceId) {
+      if (debounceSliderTimerRef.current) clearTimeout(debounceSliderTimerRef.current);
+      debounceSliderTimerRef.current = setTimeout(() => {
+        const activeVoice = CURATED_VOICES.find(v => v.id === previewingVoiceId) || CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+        handlePreviewVoice(activeVoice, voiceRate, newPitch);
+      }, 160);
+    }
+  };
+
+  const handleAuditionSelectedVoice = () => {
+    const selectedProfile = CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+    handlePreviewVoice(selectedProfile, voiceRate, voicePitch);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -397,7 +469,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         >
           <button
             id="settings-tab-profile"
-            onClick={() => setActiveTab('profile')}
+            onClick={() => switchTab('profile')}
             className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-medium border-b-2 transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'profile' ? 'font-semibold' : 'border-transparent opacity-70 hover:opacity-100'
             }`}
@@ -412,7 +484,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             id="settings-tab-preferences"
-            onClick={() => setActiveTab('preferences')}
+            onClick={() => switchTab('preferences')}
             className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-medium border-b-2 transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'preferences' ? 'font-semibold' : 'border-transparent opacity-70 hover:opacity-100'
             }`}
@@ -427,7 +499,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             id="settings-tab-security"
-            onClick={() => setActiveTab('security')}
+            onClick={() => switchTab('security')}
             className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-medium border-b-2 transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'security' ? 'font-semibold' : 'border-transparent opacity-70 hover:opacity-100'
             }`}
@@ -659,54 +731,183 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Voice & Audio Reading Preferences
                 </h3>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Customize the pacing and soothing sound while listening to your reflections
+                  Fine-tune your reading cadence, vocal pitch, and soothing soundscape
                 </p>
               </div>
 
-              {/* Ambient Sound Drone Toggle */}
+              {/* Ambient Sound Drone Toggle with Preview */}
               <div
-                className="flex items-center justify-between p-4 rounded-xl border"
+                className="p-4 rounded-xl border space-y-3"
                 style={{
                   backgroundColor: 'var(--bg-card-elevated)',
                   borderColor: 'var(--border-color)'
                 }}
               >
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      Calming 432Hz Ambient Sound
-                    </span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        Calming 432Hz Ambient Sound
+                      </span>
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Plays a soft, restful background tone while listening to reflections
+                    </p>
                   </div>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Plays a soft, restful background tone while listening to entries
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAmbientSound(!ambientSound)}
+                    className="w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0"
+                    style={{
+                      backgroundColor: ambientSound ? 'var(--accent)' : 'var(--border-color)'
+                    }}
+                    aria-label="Toggle 432Hz ambient sound"
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                        ambientSound ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAmbientSound(!ambientSound)}
-                  className="w-11 h-6 rounded-full transition-colors relative cursor-pointer"
-                  style={{
-                    backgroundColor: ambientSound ? 'var(--accent)' : 'var(--border-color)'
-                  }}
-                  aria-label="Toggle 432Hz ambient sound"
+
+                {/* 432Hz Sound Preview Control */}
+                <div
+                  className="pt-2 border-t flex items-center justify-between gap-2"
+                  style={{ borderColor: 'var(--border-color)' }}
                 >
-                  <span
-                    className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                      ambientSound ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    Audition the tranquil 432Hz tuning tone:
+                  </span>
+                  <button
+                    type="button"
+                    id="preview-432hz-ambient-btn"
+                    onClick={handleToggle432HzPreview}
+                    className="px-3 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition cursor-pointer hover:opacity-85 shrink-0"
+                    style={{
+                      backgroundColor: isPlaying432Hz ? 'var(--accent-light)' : 'var(--bg-card)',
+                      borderColor: isPlaying432Hz ? 'var(--accent)' : 'var(--border-color)',
+                      color: isPlaying432Hz ? 'var(--accent)' : 'var(--text-primary)'
+                    }}
+                  >
+                    {isPlaying432Hz ? (
+                      <>
+                        <Square className="w-3 h-3 fill-current" />
+                        <span className="text-xs font-semibold">Stop 432Hz Drone</span>
+                      </>
+                    ) : (
+                      <>
+                        <Radio className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                        <span className="text-xs font-medium">Listen to 432Hz Preview</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              {/* Narration Voice Selection */}
+              {/* SLIDERS SECTION (Placed ABOVE Voice Samples) */}
+              <div
+                className="p-4 rounded-xl border space-y-4"
+                style={{
+                  backgroundColor: 'var(--bg-card-elevated)',
+                  borderColor: 'var(--border-color)'
+                }}
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                    <span className="text-xs sm:text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Reading Speed & Voice Tone
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    id="audition-current-voice-settings-btn"
+                    onClick={handleAuditionSelectedVoice}
+                    className="px-3 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition cursor-pointer hover:opacity-85"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                    title="Audition chosen voice with current speed and pitch"
+                  >
+                    {previewingVoiceId === selectedVoiceId ? (
+                      <>
+                        <Square className="w-3 h-3 fill-current" style={{ color: 'var(--accent)' }} />
+                        <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Stop Sample</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current" style={{ color: 'var(--accent)' }} />
+                        <span className="text-xs font-medium">Test Voice Settings</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Voice Speed Slider */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                    <span>Reading Speed: <strong className="font-mono">{voiceRate.toFixed(2)}x</strong></span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {voiceRate < 0.85 ? 'Meditative & Slow' : voiceRate > 1.05 ? 'Brisk' : 'Gentle & Natural'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    id="voice-speed-slider"
+                    min="0.75"
+                    max="1.25"
+                    step="0.05"
+                    value={voiceRate}
+                    onChange={(e) => handleRateChange(parseFloat(e.target.value))}
+                    className="w-full h-1.5 rounded-lg cursor-pointer"
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <div className="flex justify-between text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    <span>0.75x (Gentle)</span>
+                    <span>1.0x (Standard)</span>
+                    <span>1.25x (Brisk)</span>
+                  </div>
+                </div>
+
+                {/* Voice Pitch Slider */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                    <span>Voice Tone (Pitch): <strong className="font-mono">{voicePitch.toFixed(2)}</strong></span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {voicePitch < 0.9 ? 'Warm & Deep' : voicePitch > 1.1 ? 'Airy & Light' : 'Balanced & Soothing'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    id="voice-pitch-slider"
+                    min="0.8"
+                    max="1.2"
+                    step="0.05"
+                    value={voicePitch}
+                    onChange={(e) => handlePitchChange(parseFloat(e.target.value))}
+                    className="w-full h-1.5 rounded-lg cursor-pointer"
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <div className="flex justify-between text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    <span>0.8 (Warm/Deeper)</span>
+                    <span>1.0 (Neutral)</span>
+                    <span>1.2 (Airy/Higher)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Narration Voice Selection (Cards now below sliders) */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Narration Voice
+                    Mindful Voice Guide
                   </label>
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    Select your preferred mindful guide
+                    Choose your companion voice
                   </span>
                 </div>
 
@@ -805,46 +1006,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     );
                   })}
                 </div>
-              </div>
-
-              {/* Voice Speed Slider */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                  <span>Reading Speed: {voiceRate.toFixed(2)}x</span>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    {voiceRate < 0.9 ? 'Slow & Gentle' : voiceRate > 1.05 ? 'Brisk' : 'Natural Pacing'}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.75"
-                  max="1.25"
-                  step="0.05"
-                  value={voiceRate}
-                  onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
-                  className="w-full h-1.5 rounded-lg cursor-pointer"
-                  style={{ accentColor: 'var(--accent)' }}
-                />
-              </div>
-
-              {/* Voice Pitch Slider */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                  <span>Voice Tone (Pitch): {voicePitch.toFixed(2)}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    {voicePitch < 0.9 ? 'Warm & Deep' : voicePitch > 1.1 ? 'Light' : 'Balanced'}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.8"
-                  max="1.2"
-                  step="0.05"
-                  value={voicePitch}
-                  onChange={(e) => setVoicePitch(parseFloat(e.target.value))}
-                  className="w-full h-1.5 rounded-lg cursor-pointer"
-                  style={{ accentColor: 'var(--accent)' }}
-                />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
