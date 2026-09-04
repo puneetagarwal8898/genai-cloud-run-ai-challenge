@@ -1,75 +1,44 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  APIProvider,
-  Map,
-  AdvancedMarker,
-  Pin
-} from '@vis.gl/react-google-maps';
 import {
   X,
   MapPin,
-  Compass,
   Navigation,
-  Check,
-  Sparkles,
-  Search,
   Globe,
-  Tag
+  Tag,
+  Check
 } from 'lucide-react';
-import { JournalInteraction, SanctuaryLocation } from '../types';
+import { motion } from 'motion/react';
+import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { SanctuaryLocation, JournalInteraction } from '../types';
+import { InfoTooltip } from './InfoTooltip';
 
 interface LocationSanctuaryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activeInteraction: JournalInteraction | null;
-  interactionsWithLocation: JournalInteraction[];
   onLocationTagged: (location: SanctuaryLocation) => void;
+  existingLocation?: SanctuaryLocation;
+  interactionsWithLocation?: JournalInteraction[];
 }
 
 const SANCTUARY_PRESETS = [
-  {
-    name: 'Arashiyama Bamboo Grove, Kyoto',
-    latitude: 35.0165,
-    longitude: 135.6713,
-    description: 'A tranquil canopy of swaying green bamboo'
-  },
-  {
-    name: 'Big Sur Coastal Sanctuary, California',
-    latitude: 36.2704,
-    longitude: -121.8081,
-    description: 'Pacific mist and timeless ocean horizons'
-  },
-  {
-    name: 'Lake Louise Alpine Reflection, Banff',
-    latitude: 51.4254,
-    longitude: -116.1773,
-    description: 'Glacial turquoise waters embraced by towering peaks'
-  },
-  {
-    name: 'High Line Solitude Garden, New York',
-    latitude: 40.748,
-    longitude: -74.0048,
-    description: 'Elevated urban sanctuary among native prairie grasses'
-  }
+  { name: 'Kyoto Bamboo Grove, Japan', latitude: 35.0165, longitude: 135.6713, description: 'Tranquil whispering bamboo' },
+  { name: 'Big Sur Coastline, California', latitude: 36.2704, longitude: -121.8081, description: 'Pacific mist and ocean waves' },
+  { name: 'Lake District, England', latitude: 54.4609, longitude: -3.0886, description: 'Gentle green rolling hills' },
+  { name: 'Mount Fuji Foothills, Japan', latitude: 35.3606, longitude: 138.7274, description: 'Grounded morning calm' }
 ];
 
 export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
   isOpen,
   onClose,
-  activeInteraction,
-  interactionsWithLocation,
-  onLocationTagged
+  onLocationTagged,
+  existingLocation,
+  interactionsWithLocation = []
 }) => {
-  const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
-
+  const [placeName, setPlaceName] = useState(existingLocation?.placeName || '');
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number }>(
-    activeInteraction?.location
-      ? { lat: activeInteraction.location.latitude, lng: activeInteraction.location.longitude }
+    existingLocation
+      ? { lat: existingLocation.latitude, lng: existingLocation.longitude }
       : { lat: 35.0165, lng: 135.6713 }
-  );
-  const [placeName, setPlaceName] = useState(
-    activeInteraction?.location?.placeName || 'My Quiet Sanctuary'
   );
   const [isLocating, setIsLocating] = useState(false);
   const [locationSuccess, setLocationSuccess] = useState(false);
@@ -77,22 +46,23 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
-    }
+  const apiKey =
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+    import.meta.env.VITE_MAPS_API_KEY ||
+    '';
 
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) return;
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
-        setPlaceName(`Sanctuary (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`);
+        setPlaceName(`Peaceful Spot (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`);
         setIsLocating(false);
       },
       (err) => {
-        console.warn('Geolocation lookup notice:', err.message);
+        console.warn('Location lookup notice:', err.message);
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000 }
@@ -103,7 +73,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
     const loc: SanctuaryLocation = {
       latitude: currentPos.lat,
       longitude: currentPos.lng,
-      placeName: placeName.trim() || 'Mindful Sanctuary'
+      placeName: placeName.trim() || 'Peaceful Spot'
     };
     onLocationTagged(loc);
     setLocationSuccess(true);
@@ -114,41 +84,76 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
   };
 
   return (
-    <div id="location-sanctuary-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div
+      id="location-sanctuary-backdrop"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(6px)' }}
+    >
       <motion.div
         id="location-sanctuary-content"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[88vh]"
+        className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden my-4 flex flex-col max-h-[90vh]"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-color)',
+          color: 'var(--text-primary)'
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/50">
+        <div
+          className="flex items-center justify-between px-5 py-4 border-b shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-card-elevated)',
+            borderColor: 'var(--border-color)'
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: 'var(--accent-light)',
+                color: 'var(--accent)'
+              }}
+            >
               <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 font-serif">
-                Location-Aware Sanctuary Journey
-              </h2>
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                Ground your reflections in physical space and map your sacred mental geographies
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
+                  Peaceful Places &bull; Location Tag
+                </h2>
+                <InfoTooltip text="Tag a tranquil place in the real world where you wrote your reflection, like a quiet park, favorite cafe, or quiet room at home." />
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Remember the peaceful atmosphere where you found clarity
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--text-secondary)'
+            }}
+            aria-label="Close location tagger"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 p-6 overflow-y-auto space-y-6">
-          {/* Map Section */}
-          <div className="relative rounded-2xl overflow-hidden border border-stone-200 dark:border-stone-800 h-[280px] bg-stone-100 dark:bg-stone-950 flex flex-col justify-center items-center shadow-inner">
+        <div className="flex-1 p-5 sm:p-6 overflow-y-auto space-y-5 custom-scrollbar text-sm">
+          {/* Map Preview */}
+          <div
+            className="relative rounded-2xl overflow-hidden border h-[240px] flex flex-col justify-center items-center shadow-inner"
+            style={{
+              backgroundColor: 'var(--bg-canvas)',
+              borderColor: 'var(--border-color)'
+            }}
+          >
             {apiKey ? (
               <APIProvider apiKey={apiKey}>
                 <Map
@@ -160,12 +165,10 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
                   className="w-full h-full"
                   gestureHandling="cooperative"
                 >
-                  {/* Current Active Marker */}
                   <AdvancedMarker position={currentPos}>
-                    <Pin background="#d97706" glyphColor="#ffffff" borderColor="#b45309" />
+                    <Pin background="#f59e0b" glyphColor="#ffffff" borderColor="#d97706" />
                   </AdvancedMarker>
 
-                  {/* Past tagged reflections */}
                   {interactionsWithLocation.map((item) => {
                     if (!item.location) return null;
                     return (
@@ -177,67 +180,81 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
                         }}
                         onClick={() => setSelectedPin(item)}
                       >
-                        <Pin background="#4f46e5" glyphColor="#ffffff" borderColor="#3730a3" />
+                        <Pin background="#0ea5e9" glyphColor="#ffffff" borderColor="#0284c7" />
                       </AdvancedMarker>
                     );
                   })}
                 </Map>
               </APIProvider>
             ) : (
-              <div className="p-6 text-center space-y-3">
-                <Globe className="w-10 h-10 mx-auto text-amber-600 dark:text-amber-400 opacity-80" />
+              <div className="p-6 text-center space-y-2">
+                <Globe className="w-8 h-8 mx-auto" style={{ color: 'var(--accent)' }} />
                 <div>
-                  <h4 className="text-sm font-semibold text-stone-800 dark:text-stone-200">
-                    Sanctuary Geolocation Engine Active
+                  <h4 className="text-xs sm:text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Coordinates Saved
                   </h4>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto mt-1">
-                    Latitude: <span className="font-mono text-amber-600">{currentPos.lat.toFixed(4)}° N</span>,{' '}
-                    Longitude: <span className="font-mono text-amber-600">{currentPos.lng.toFixed(4)}° E</span>
+                  <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--accent)' }}>
+                    {currentPos.lat.toFixed(4)}° N, {currentPos.lng.toFixed(4)}° E
                   </p>
                 </div>
-                <div className="text-[11px] text-stone-400 max-w-sm mx-auto">
-                  To view live interactive Google Maps satellite tiles, configure <code className="bg-stone-200 dark:bg-stone-800 px-1 py-0.5 rounded font-mono text-[10px]">VITE_GOOGLE_MAPS_API_KEY</code>. Coordinates and sanctuary markers function seamlessly.
-                </div>
+                <p className="text-[11px] max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
+                  Your spot is tagged and saved to your reflection history.
+                </p>
               </div>
             )}
 
             {/* Selected Pin Overlay */}
             {selectedPin && (
-              <div className="absolute top-3 left-3 right-3 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 shadow-lg text-xs space-y-1 z-20">
+              <div
+                className="absolute top-3 left-3 right-3 p-3 rounded-xl border shadow-lg text-xs space-y-1 z-20"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)'
+                }}
+              >
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-amber-600 dark:text-amber-400">
-                    {selectedPin.location?.placeName || 'Past Reflection Marker'}
+                  <span className="font-semibold" style={{ color: 'var(--accent)' }}>
+                    {selectedPin.location?.placeName || 'Past Reflection'}
                   </span>
                   <button
                     onClick={() => setSelectedPin(null)}
-                    className="text-stone-400 hover:text-stone-600"
+                    className="opacity-70 hover:opacity-100 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-stone-700 dark:text-stone-300 italic line-clamp-2">
+                <p className="italic line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
                   "{selectedPin.prompt}"
                 </p>
-                <p className="text-[10px] text-stone-400 font-mono">
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                   {new Date(selectedPin.timestamp).toLocaleDateString()}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Location Details & Name Form */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
-                Sanctuary Name / Landmark
-              </label>
+          {/* Location Name & Device Position */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Place Name / Label
+                </label>
+                <InfoTooltip text="Give your spot a name, like 'My Garden Porch' or 'Quiet Corner Cafe'." />
+              </div>
               <input
                 id="location-name-input"
                 type="text"
                 value={placeName}
                 onChange={(e) => setPlaceName(e.target.value)}
-                placeholder="e.g. Garden Pavilion, Mountain Porch"
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/60 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                placeholder="e.g. Garden Pavilion, Morning Porch"
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl border focus:outline-none transition"
+                style={{
+                  backgroundColor: 'var(--bg-input)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)'
+                }}
               />
             </div>
 
@@ -246,19 +263,27 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
                 type="button"
                 onClick={handleGetCurrentLocation}
                 disabled={isLocating}
-                className="w-full py-2.5 px-4 rounded-xl border border-amber-600/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-medium transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 rounded-xl border text-xs font-medium transition cursor-pointer flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: 'var(--accent-light)',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)'
+                }}
               >
                 <Navigation className="w-4 h-4" />
-                {isLocating ? 'Acquiring GPS Signal...' : 'Tag My Current Device Location'}
+                {isLocating ? 'Detecting Location...' : 'Use My Current Location'}
               </button>
             </div>
           </div>
 
           {/* Sanctuary Geographies Presets */}
           <div>
-            <span className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-              Or Choose a World Sanctuary Preset
-            </span>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Or Choose a Peaceful Destination
+              </span>
+              <InfoTooltip text="Preset tranquil natural locations around the world known for mindfulness and calm." />
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {SANCTUARY_PRESETS.map((preset) => (
                 <button
@@ -266,27 +291,39 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
                   type="button"
                   onClick={() => {
                     setCurrentPos({ lat: preset.latitude, lng: preset.longitude });
-                    setPlaceName(preset.name);
+                    setPlaceName(preset.name.split(',')[0]);
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
-                    placeName === preset.name
-                      ? 'border-amber-500 bg-amber-50/60 dark:bg-amber-950/30'
-                      : 'border-stone-200 dark:border-stone-800 hover:border-stone-300'
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                    placeName === preset.name.split(',')[0] ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
                   }`}
+                  style={{
+                    backgroundColor: placeName === preset.name.split(',')[0] ? 'var(--accent-light)' : 'var(--bg-card-elevated)',
+                    borderColor: placeName === preset.name.split(',')[0] ? 'var(--accent)' : 'var(--border-color)',
+                    color: placeName === preset.name.split(',')[0] ? 'var(--accent)' : 'var(--text-primary)'
+                  }}
                 >
-                  <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">
+                  <p className="text-xs font-semibold truncate">
                     {preset.name.split(',')[0]}
                   </p>
-                  <p className="text-[10px] text-stone-400 line-clamp-1">{preset.description}</p>
+                  <p className="text-[10px] line-clamp-1" style={{ color: 'var(--text-muted)' }}>
+                    {preset.description}
+                  </p>
                 </button>
               ))}
             </div>
           </div>
 
           {locationSuccess && (
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs rounded-xl flex items-center gap-2 border border-emerald-200 dark:border-emerald-800">
-              <Check className="w-4 h-4 text-emerald-600" />
-              Location "{placeName}" attached to reflection!
+            <div
+              className="p-3 rounded-xl border flex items-center gap-2 text-xs"
+              style={{
+                backgroundColor: 'var(--accent-light)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)'
+              }}
+            >
+              <Check className="w-4 h-4 shrink-0" />
+              Place "{placeName}" attached to reflection!
             </div>
           )}
 
@@ -294,7 +331,8 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+              className="px-4 py-2 text-xs opacity-70 hover:opacity-100 transition cursor-pointer"
+              style={{ color: 'var(--text-secondary)' }}
             >
               Cancel
             </button>
@@ -302,7 +340,11 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
               id="confirm-tag-location-button"
               type="button"
               onClick={handleApplyLocation}
-              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium shadow-sm transition-all flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl text-xs font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+              style={{
+                backgroundColor: 'var(--accent)',
+                color: '#ffffff'
+              }}
             >
               <Tag className="w-3.5 h-3.5" />
               Attach Location Tag
