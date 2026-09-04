@@ -11,7 +11,8 @@ import {
   Sparkles,
   Sliders,
   Calendar,
-  Key
+  Key,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
@@ -146,9 +147,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   };
 
   const handleDeleteAccount = async () => {
-    if (deleteInput.trim().toUpperCase() !== 'DELETE') return;
-    setIsDeleting(true);
     setDeleteError(null);
+    const trimmedConfirm = deleteInput.trim();
+    if (trimmedConfirm !== 'DELETE') {
+      setDeleteError("Please type DELETE (in capital letters) in the confirmation box.");
+      return;
+    }
+
+    if (userProfile?.authProvider === 'email' && !deletePassword.trim()) {
+      setDeleteError("Please enter your account password to confirm account deletion.");
+      return;
+    }
+
+    setIsDeleting(true);
 
     try {
       await deleteUserAccount(deletePassword.trim() || undefined);
@@ -162,6 +173,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   return (
     <div
       id="settings-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isDeleting) {
+          onClose();
+        }
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(6px)' }}
     >
@@ -208,7 +224,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           <button
             id="settings-modal-close-button"
             onClick={onClose}
-            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+            disabled={isDeleting}
+            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
               backgroundColor: 'var(--bg-card)',
               color: 'var(--text-secondary)'
@@ -737,44 +754,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 ) : (
                   <div className="space-y-3 pt-2 border-t border-rose-500/20">
                     <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
-                      To confirm permanent deletion, please type <span className="font-mono px-1.5 py-0.5 rounded bg-rose-500/20">DELETE</span> below:
+                      To confirm permanent deletion, please type <span className="font-mono px-1.5 py-0.5 rounded bg-rose-500/20 font-bold">DELETE</span> below:
                     </p>
                     <input
                       id="confirm-delete-input"
                       type="text"
+                      disabled={isDeleting}
                       value={deleteInput}
-                      onChange={(e) => setDeleteInput(e.target.value)}
+                      onChange={(e) => {
+                        setDeleteInput(e.target.value);
+                        if (deleteError) setDeleteError(null);
+                      }}
                       placeholder="Type DELETE"
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     {userProfile?.authProvider === 'email' && (
                       <div className="space-y-1">
                         <label className="text-[11px] font-medium text-rose-700 dark:text-rose-300">
-                          Account password (required to confirm identity):
+                          Account password (required to verify identity):
                         </label>
                         <input
                           id="confirm-delete-password-input"
                           type="password"
+                          disabled={isDeleting}
                           autoComplete="current-password"
                           value={deletePassword}
-                          onChange={(e) => setDeletePassword(e.target.value)}
+                          onChange={(e) => {
+                            setDeletePassword(e.target.value);
+                            if (deleteError) setDeleteError(null);
+                          }}
                           placeholder="Enter your account password"
-                          className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
                     )}
                     {deleteError && (
-                      <p className="text-xs text-rose-600">{deleteError}</p>
+                      <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-[11px]">Action Required</p>
+                          <p className="text-[11px] leading-relaxed">{deleteError}</p>
+                        </div>
+                      </div>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 pt-1">
                       <button
                         type="button"
+                        disabled={isDeleting}
                         onClick={() => {
                           setShowDeleteConfirm(false);
                           setDeleteInput('');
+                          setDeletePassword('');
                           setDeleteError(null);
                         }}
-                        className="px-3 py-1.5 text-xs opacity-70 hover:opacity-100 cursor-pointer"
+                        className="px-3 py-1.5 text-xs opacity-70 hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
                         style={{ color: 'var(--text-secondary)' }}
                       >
                         Cancel
@@ -782,11 +815,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                       <button
                         id="final-delete-account-button"
                         type="button"
-                        disabled={isDeleting || deleteInput.trim().toUpperCase() !== 'DELETE'}
+                        disabled={isDeleting}
                         onClick={handleDeleteAccount}
-                        className="px-4 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-medium disabled:opacity-40 transition cursor-pointer shadow-sm"
+                        className="px-4 py-2 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-semibold disabled:opacity-50 transition cursor-pointer shadow-sm flex items-center gap-2"
                       >
-                        {isDeleting ? 'Deleting all journals & account...' : 'Permanently Delete My Account'}
+                        {isDeleting ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Deleting account...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Permanently Delete My Account</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
