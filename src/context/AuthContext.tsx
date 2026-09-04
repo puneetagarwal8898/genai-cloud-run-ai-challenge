@@ -8,7 +8,8 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
   sendEmailVerification,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  deleteUser
 } from 'firebase/auth';
 import {
   auth,
@@ -19,7 +20,8 @@ import {
   linkedInLegacyProvider,
   getFirebaseCredentialsStatus
 } from '../firebase';
-import { AuthProviderType, UserProfile } from '../types';
+import { AuthProviderType, UserProfile, UserPreferences } from '../types';
+import { wipeAllUserData } from '../services/journalService';
 
 export interface PendingVerification {
   email: string;
@@ -51,6 +53,8 @@ interface AuthContextType {
   cancelEmailVerification: () => void;
   signInAsDemoUser: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateUserProfileData: (updates: { displayName?: string; photoURL?: string; preferences?: UserPreferences }) => Promise<void>;
+  deleteUserAccount: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -808,6 +812,92 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserProfileData = async (updates: { displayName?: string; photoURL?: string; preferences?: UserPreferences }): Promise<void> => {
+    if (!userProfile) return;
+    setError(null);
+
+    const updatedProfile: UserProfile = {
+      ...userProfile,
+      ...(updates.displayName !== undefined ? { displayName: updates.displayName } : {}),
+      ...(updates.photoURL !== undefined ? { photoURL: updates.photoURL } : {}),
+      ...(updates.preferences !== undefined ? {
+        preferences: {
+          ...(userProfile.preferences || {}),
+          ...updates.preferences
+        }
+      } : {})
+    };
+
+    setUserProfile(updatedProfile);
+    saveActiveSession(updatedProfile);
+
+    // Update registered accounts record if email user
+    try {
+      const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+      if (accountsRaw && userProfile.email) {
+        const accounts = JSON.parse(accountsRaw);
+        const emailKey = userProfile.email.toLowerCase();
+        if (accounts[emailKey]) {
+          accounts[emailKey].profile = updatedProfile;
+          localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+        }
+      }
+    } catch (e) {
+      console.warn("Accounts sync note:", e);
+    }
+
+    // Update Firebase Auth user profile if configured
+    try {
+      const activeAuth = getActiveAuth();
+      if (activeAuth.currentUser) {
+        await updateProfile(activeAuth.currentUser, {
+          displayName: updates.displayName !== undefined ? updates.displayName : activeAuth.currentUser.displayName,
+          photoURL: updates.photoURL !== undefined ? updates.photoURL : activeAuth.currentUser.photoURL
+        });
+      }
+    } catch (fbErr: any) {
+      console.warn("Firebase Auth profile update warning:", fbErr.message);
+    }
+  };
+
+  const deleteUserAccount = async (): Promise<void> => {
+    setError(null);
+    const targetUid = userProfile?.uid || user?.uid;
+    if (!targetUid) {
+      throw new Error("No active user session found to delete.");
+    }
+
+    // 1. Wipe all personal interactions and profile data from Cloud Firestore & local storage
+    await wipeAllUserData(targetUid);
+
+    // 2. Remove from local accounts registry if email provider
+    try {
+      const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+      if (accountsRaw && userProfile?.email) {
+        const accounts = JSON.parse(accountsRaw);
+        delete accounts[userProfile.email.toLowerCase()];
+        localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+      }
+    } catch (e) {
+      console.warn("Accounts registry clean note:", e);
+    }
+
+    // 3. Delete Firebase Auth account
+    try {
+      const activeAuth = getActiveAuth();
+      if (activeAuth.currentUser) {
+        await deleteUser(activeAuth.currentUser);
+      }
+    } catch (authErr: any) {
+      console.warn("Firebase Auth deleteUser note (may require recent login):", authErr.message);
+    }
+
+    // 4. Wipe session and reset state
+    localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+    setUser(null);
+    setUserProfile(null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -830,6 +920,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cancelEmailVerification,
         signInAsDemoUser,
         signOut,
+        updateUserProfileData,
+        deleteUserAccount,
         clearError: () => setError(null)
       }}
     >

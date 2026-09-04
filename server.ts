@@ -410,13 +410,14 @@ app.post("/api/gemini/converse", async (req, res) => {
       parts: [{ text: prompt }]
     });
 
-    // Enhance system instruction to mandate structured JSON with response, summary, and 3 suggestions
+    // Enhance system instruction to mandate structured JSON with response, summary, 3 suggestions, and mood
     systemInstruction += `
 
-You MUST respond in valid JSON format with three fields:
+You MUST respond in valid JSON format with four fields:
 1. "response": (string) Your complete, thoughtful, and compassionate reflection response to the user's latest thought.
 2. "summary": (string) A crisp 1-sentence synopsis under 18 words.
 3. "suggestedPrompts": (array of 3 strings) Exactly 3 short, intriguing follow-up questions or reflection prompts (under 55 characters each) that the user can click next to continue this dialogue.
+4. "mood": (string) Exactly one of: "calm", "clarity", "gratitude", "courage", "growth", "anxious", "reflective" that best captures the emotional undertone.
 Return ONLY pure JSON.`;
 
     const aiResult = await generateContentWithFallback(contents, {
@@ -428,6 +429,7 @@ Return ONLY pure JSON.`;
     let responseText = "";
     let summary = "";
     let suggestedPrompts: string[] = [];
+    let detectedMood = "reflective";
 
     try {
       const cleanJson = aiResult.text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
@@ -444,6 +446,13 @@ Return ONLY pure JSON.`;
             .map((s: any) => String(s).trim())
             .filter((s: string) => s.length > 0)
             .slice(0, 3);
+        }
+        if (typeof parsed.mood === "string") {
+          const validMoods = ["calm", "clarity", "gratitude", "courage", "growth", "anxious", "reflective"];
+          const normalized = parsed.mood.toLowerCase().trim();
+          if (validMoods.includes(normalized)) {
+            detectedMood = normalized;
+          }
         }
       }
     } catch (parseErr) {
@@ -488,6 +497,7 @@ Return ONLY pure JSON.`;
       response: responseText,
       summary: summary || prompt.slice(0, 80) + (prompt.length > 80 ? "..." : ""),
       suggestedPrompts,
+      mood: detectedMood,
       modelUsed: aiResult.modelUsed
     });
   } catch (error: any) {
@@ -495,6 +505,87 @@ Return ONLY pure JSON.`;
     res.status(500).json({
       error: error?.message || "Failed to generate AI response. Please verify Gemini API key configuration."
     });
+  }
+});
+
+// Time Capsule Growth Synthesis Endpoint
+app.post("/api/gemini/synthesize-growth", async (req, res) => {
+  try {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const pastPrompt = typeof body.pastPrompt === "string" ? body.pastPrompt.trim() : "";
+    const pastResponse = typeof body.pastResponse === "string" ? body.pastResponse.trim() : "";
+    const sealedDate = typeof body.sealedDate === "string" ? body.sealedDate : "the past";
+    const currentContext = typeof body.currentContext === "string" ? body.currentContext.trim() : "";
+
+    if (!pastPrompt) {
+      res.status(400).json({ error: "Time capsule reflection content is required." });
+      return;
+    }
+
+    const systemInstruction = `You are ReflectAI's Temporal Growth Synthesizer.
+The user sealed a reflection into a Serenity Time Capsule on ${sealedDate}.
+They are now unsealing it to examine how they have grown and evolved.
+
+You MUST respond in valid JSON format with three fields:
+1. "growthAnalysis": (string) An empathetic, deep, and encouraging reflection comparing their mindset when they sealed the capsule to their present journey. Focus on resilience, expanded perspective, and emotional evolution. (approx 120-180 words).
+2. "celebrationText": (string) A concise, poetic affirmation celebrating their growth and courage (1-2 sentences).
+3. "emergentStrengths": (array of 3 short strings) 3 positive psychological or emotional strengths demonstrated across their journey (e.g. "Grounded Patience", "Decisive Self-Compassion", "Clarity Under Ambiguity").
+Return ONLY pure JSON.`;
+
+    const promptText = `PAST SEALED REFLECTION (${sealedDate}):
+"${pastPrompt}"
+
+PAST REFLECTAI GUIDANCE:
+"${pastResponse}"
+
+CURRENT PERSPECTIVE / UPDATES FROM USER:
+"${currentContext || "I am unsealing this capsule today to reflect on how far I have come."}"`;
+
+    const aiResult = await generateContentWithFallback(promptText, {
+      systemInstruction,
+      temperature: 0.6,
+      responseMimeType: "application/json"
+    });
+
+    let growthAnalysis = "";
+    let celebrationText = "";
+    let emergentStrengths: string[] = [];
+
+    try {
+      const cleanJson = aiResult.text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      const parsed = JSON.parse(cleanJson);
+      if (parsed && typeof parsed === "object") {
+        growthAnalysis = typeof parsed.growthAnalysis === "string" ? parsed.growthAnalysis.trim() : "";
+        celebrationText = typeof parsed.celebrationText === "string" ? parsed.celebrationText.trim() : "";
+        if (Array.isArray(parsed.emergentStrengths)) {
+          emergentStrengths = parsed.emergentStrengths.map((s: any) => String(s).trim()).filter(Boolean);
+        }
+      }
+    } catch (e) {
+      growthAnalysis = aiResult.text.trim();
+      celebrationText = "You have traversed distance and time with courage and quiet strength.";
+      emergentStrengths = ["Resilience", "Mindful Self-Awareness", "Patience"];
+    }
+
+    if (!growthAnalysis) {
+      growthAnalysis = "Looking back across time, the uncertainty that once felt overwhelming has transformed into wisdom. You have adapted, gained perspective, and continued forward with quiet perseverance.";
+    }
+    if (!celebrationText) {
+      celebrationText = "Honor the person who sealed this capsule and celebrate the person who opened it today.";
+    }
+    if (emergentStrengths.length === 0) {
+      emergentStrengths = ["Self-Compassion", "Emotional Perspective", "Forward Momentum"];
+    }
+
+    res.json({
+      growthAnalysis,
+      celebrationText,
+      emergentStrengths,
+      modelUsed: aiResult.modelUsed
+    });
+  } catch (err: any) {
+    console.error("Growth synthesis error:", err);
+    res.status(500).json({ error: err.message || "Failed to synthesize growth." });
   }
 });
 

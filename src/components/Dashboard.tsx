@@ -21,17 +21,25 @@ import {
   ArrowRight,
   Lock,
   FlaskConical,
-  Mail
+  Mail,
+  Sliders,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { JournalInteraction, ReflectionMode } from '../types';
+import { JournalInteraction, ReflectionMode, SanctuaryLocation, SanctuaryMood } from '../types';
 import {
   saveJournalInteraction,
   fetchUserInteractions,
   deleteUserInteraction
 } from '../services/journalService';
 import { ThemeSelector } from './ThemeSelector';
+import { SettingsModal } from './SettingsModal';
+import { ResonanceMapModal } from './ResonanceMapModal';
+import { TimeCapsuleModal } from './TimeCapsuleModal';
+import { LocationSanctuaryModal } from './LocationSanctuaryModal';
+import { AudioNarrationPlayer } from './AudioNarrationPlayer';
+import { SanctuaryVoiceInput } from './SanctuaryVoiceInput';
 
 // Thoughtful, joyful reflections while the AI is reflecting
 const THINKING_PHRASES = [
@@ -80,6 +88,13 @@ export const Dashboard: React.FC = () => {
   const [conversationTrail, setConversationTrail] = useState<Array<{ role: 'user' | 'model'; text: string }>>([]);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
+
+  // Standout Feature Modals & Staging
+  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showResonanceMap, setShowResonanceMap] = useState<boolean>(false);
+  const [showTimeCapsule, setShowTimeCapsule] = useState<boolean>(false);
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
+  const [stagedLocation, setStagedLocation] = useState<SanctuaryLocation | null>(null);
 
   // Email verification gate: email auth accounts require emailVerified: true to converse
   const isEmailUnverified = userProfile?.authProvider === 'email' && !userProfile?.emailVerified;
@@ -267,7 +282,10 @@ export const Dashboard: React.FC = () => {
       // 3. Immediately clear isSubmitting so the thinking spinner disappears the very instant response arrives!
       setIsSubmitting(false);
 
-      // Create full interaction record
+      // Create full interaction record with standout feature attributes
+      const detectedMood = (data.mood as SanctuaryMood) || 'reflective';
+      const interactionLocation = stagedLocation || (interactions.find(i => i.id === interactionId)?.location);
+
       const fullInteraction: JournalInteraction = {
         id: interactionId,
         userId: currentUserId,
@@ -276,11 +294,16 @@ export const Dashboard: React.FC = () => {
         geminiResponse: geminiResponseText,
         summary: summaryText,
         mode,
+        mood: detectedMood,
+        location: interactionLocation,
         suggestedPrompts: newSuggestedPrompts,
         trail: finalTrail,
         createdAt: isNewChat ? now : (interactions.find(i => i.id === interactionId)?.createdAt || now),
         updatedAt: now
       };
+
+      // Reset staged location once reflection is preserved
+      setStagedLocation(null);
 
       // Update state list
       setInteractions(prev => {
@@ -495,6 +518,57 @@ export const Dashboard: React.FC = () => {
           {/* Quick theme selector and light/dark toggle */}
           <ThemeSelector />
 
+          {/* Standout Features Nav Cluster */}
+          <div className="hidden lg:flex items-center gap-1.5 pl-1 border-l" style={{ borderColor: 'var(--border-color)' }}>
+            <button
+              id="open-resonance-map-btn"
+              type="button"
+              onClick={() => setShowResonanceMap(true)}
+              title="Echoes of Mind - Emotional Resonance Map"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-500" />
+              <span>Echoes</span>
+            </button>
+
+            <button
+              id="open-time-capsule-btn"
+              type="button"
+              onClick={() => setShowTimeCapsule(true)}
+              title="Serenity Time Capsule - Sealed Mindful Letters"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
+              <span>Capsule</span>
+            </button>
+
+            <button
+              id="open-location-sanctuary-btn"
+              type="button"
+              onClick={() => setShowLocationModal(true)}
+              title="Location-Aware Sanctuary Journey"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <MapPin className="w-3.5 h-3.5 text-amber-500" />
+              <span>Sanctuaries</span>
+            </button>
+          </div>
+
           <button
             id="new-entry-btn-header"
             onClick={startNewEntry}
@@ -539,6 +613,22 @@ export const Dashboard: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Account Settings Modal Trigger */}
+            <button
+              id="open-settings-modal-btn"
+              type="button"
+              onClick={() => setShowSettingsModal(true)}
+              title="Account Settings & Preferences"
+              className="p-1.5 rounded-lg border transition cursor-pointer hover:opacity-85"
+              style={{
+                backgroundColor: 'var(--bg-input)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <Sliders className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           <button
@@ -946,17 +1036,28 @@ export const Dashboard: React.FC = () => {
                     msg.role === 'user' ? 'items-end' : 'items-start'
                   }`}
                 >
-                  <div className="flex items-center gap-2 mb-1.5 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                    {msg.role === 'user' ? (
-                      <>
-                        <span>You</span>
-                        <UserIcon className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-                        <span style={{ color: 'var(--accent)' }}>ReflectAI &bull; Gentle Guide</span>
-                      </>
+                  <div className="flex items-center justify-between w-full max-w-2xl mb-1.5 gap-2">
+                    <div className="flex items-center gap-2 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                      {msg.role === 'user' ? (
+                        <>
+                          <span>You</span>
+                          <UserIcon className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+                          <span style={{ color: 'var(--accent)' }}>ReflectAI &bull; Gentle Guide</span>
+                        </>
+                      )}
+                    </div>
+
+                    {msg.role === 'model' && (
+                      <AudioNarrationPlayer
+                        textToRead={msg.text}
+                        voiceRate={userProfile?.preferences?.voiceRate || 0.95}
+                        voicePitch={userProfile?.preferences?.voicePitch || 1.0}
+                        ambientSoundEnabled={userProfile?.preferences?.ambientSound ?? true}
+                      />
                     )}
                   </div>
                   <div
@@ -1142,25 +1243,72 @@ export const Dashboard: React.FC = () => {
                     style={{ color: 'var(--text-primary)' }}
                   />
                   <div
-                    className="flex items-center justify-between pt-2 border-t mt-1"
+                    className="flex flex-wrap items-center justify-between pt-2 border-t mt-1 gap-2"
                     style={{ borderColor: 'var(--border-color)' }}
                   >
-                    <span className="text-[10px] hidden sm:inline font-mono" style={{ color: 'var(--text-muted)' }}>
-                      Enter to send &bull; Shift+Enter for new line
-                    </span>
-                    <button
-                      id="submit-reflection-btn"
-                      type="submit"
-                      disabled={isSubmitting || !prompt.trim()}
-                      className="px-4 py-1.5 rounded-xl text-xs font-medium text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ml-auto hover:opacity-90"
-                      style={{
-                        backgroundColor: 'var(--accent)',
-                        boxShadow: '0 0 12px var(--accent-glow)'
-                      }}
-                    >
-                      <span>Send</span>
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Sanctuary Voice Input with live transcription */}
+                      <SanctuaryVoiceInput
+                        currentValue={prompt}
+                        onTranscriptChange={(transcript) => setPrompt(transcript)}
+                        disabled={isSubmitting || isEmailUnverified}
+                      />
+
+                      {/* Location-Aware Sanctuary Journey Tagger */}
+                      <button
+                        id="tag-location-btn"
+                        type="button"
+                        onClick={() => setShowLocationModal(true)}
+                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85"
+                        style={{
+                          backgroundColor: stagedLocation ? 'rgba(217, 119, 6, 0.12)' : 'var(--bg-card-elevated)',
+                          borderColor: stagedLocation ? '#d97706' : 'var(--border-color)',
+                          color: stagedLocation ? '#d97706' : 'var(--text-muted)'
+                        }}
+                        title="Ground reflection in a physical sanctuary"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="max-w-[110px] truncate text-[11px]">
+                          {stagedLocation ? stagedLocation.placeName : 'Tag Location'}
+                        </span>
+                      </button>
+
+                      {/* Serenity Time Capsule Seal shortcut */}
+                      <button
+                        id="capsule-active-btn"
+                        type="button"
+                        onClick={() => setShowTimeCapsule(true)}
+                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85"
+                        style={{
+                          backgroundColor: 'var(--bg-card-elevated)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-muted)'
+                        }}
+                        title="Seal in Serenity Time Capsule"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-[11px] hidden sm:inline">Capsule</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-auto">
+                      <span className="text-[10px] hidden md:inline font-mono" style={{ color: 'var(--text-muted)' }}>
+                        Enter to send &bull; Shift+Enter for new line
+                      </span>
+                      <button
+                        id="submit-reflection-btn"
+                        type="submit"
+                        disabled={isSubmitting || !prompt.trim()}
+                        className="px-4 py-1.5 rounded-xl text-xs font-medium text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 hover:opacity-90"
+                        style={{
+                          backgroundColor: 'var(--accent)',
+                          boxShadow: '0 0 12px var(--accent-glow)'
+                        }}
+                      >
+                        <span>Send</span>
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1267,6 +1415,41 @@ export const Dashboard: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Standout Feature 1: Account Settings & Preferences Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
+
+      {/* Standout Feature 2: Echoes of Mind - Emotional Resonance Map Modal */}
+      <ResonanceMapModal
+        isOpen={showResonanceMap}
+        onClose={() => setShowResonanceMap(false)}
+        interactions={interactions}
+        onSelectInteraction={(item) => selectInteraction(item)}
+      />
+
+      {/* Standout Feature 3: Serenity Time Capsule - Sealed Mindful Letters Modal */}
+      <TimeCapsuleModal
+        isOpen={showTimeCapsule}
+        onClose={() => setShowTimeCapsule(false)}
+        userId={currentUserId}
+        interactions={interactions}
+        activeInteraction={interactions.find(i => i.id === activeInteractionId) || null}
+        onCapsuleUpdated={(updated) => {
+          setInteractions(prev => prev.map(i => i.id === updated.id ? updated : i));
+        }}
+      />
+
+      {/* Standout Feature 4: Location-Aware Sanctuary Journey Modal */}
+      <LocationSanctuaryModal
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        activeInteraction={interactions.find(i => i.id === activeInteractionId) || null}
+        interactionsWithLocation={interactions.filter(i => !!i.location)}
+        onLocationTagged={(loc) => setStagedLocation(loc)}
+      />
     </div>
   );
 };
