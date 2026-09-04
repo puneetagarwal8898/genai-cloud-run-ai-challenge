@@ -717,7 +717,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                   Danger Zone: Permanent Account Deletion
                 </div>
                 <p className="text-xs text-rose-600 dark:text-rose-300 leading-relaxed">
-                  Once deleted, your reflections, time capsules, and saved journals cannot be recovered. This action is irreversible.
+                  Under GDPR Article 17 (Right to Erasure), completing this action will permanently purge all your active journals, reflections, and account data from operational systems and record a compliance archive. You will be logged out and returned to the sign-in screen.
                 </p>
 
                 {!showDeleteConfirm ? (

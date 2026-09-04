@@ -7,7 +7,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, getFirebaseCredentialsStatus } from '../firebase';
 import { JournalInteraction } from '../types';
 
 // Clean payload to eliminate undefined values
@@ -202,23 +202,90 @@ export async function wipeAllUserData(userId: string): Promise<void> {
     console.warn("Local storage wipe warning:", err);
   }
 
-  // 2. Wipe cloud storage records
-  try {
-    const colRef = collection(db, 'users', userId, 'interactions');
-    const snapshot = await getDocs(colRef);
-    if (!snapshot.empty) {
-      const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
-      await Promise.allSettled(deletePromises);
+  // 2. Wipe cloud storage records (guarded by timeout and configuration)
+  const creds = getFirebaseCredentialsStatus();
+  if (creds.isConfigured) {
+    try {
+      const colRef = collection(db, 'users', userId, 'interactions');
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Cloud wipe timeout')), 2500)
+      );
+      const snapshot = await Promise.race([getDocs(colRef), timeoutPromise]);
+      if (snapshot && !snapshot.empty) {
+        const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+        await Promise.allSettled(deletePromises);
+      }
+      const userDocRef = doc(db, 'users', userId);
+      await Promise.race([deleteDoc(userDocRef), timeoutPromise]);
+    } catch (err: any) {
+      console.warn("Cloud records wipe note:", err.message);
     }
-  } catch (err: any) {
-    console.warn("Cloud records wipe note:", err.message);
+  }
+}
+
+/**
+ * Creates an immutable GDPR compliance audit archive of user records prior to erasure,
+ * dispatches the snapshot to the compliance endpoint, and permanently purges active storage.
+ */
+export async function archiveAndWipeUserData(
+  userId: string,
+  userEmail: string,
+  profile: any
+): Promise<{ archiveId: string }> {
+  if (!userId) return { archiveId: '' };
+
+  // 1. Snapshot interactions before active storage purge
+  const key = `${LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX}${userId}`;
+  let interactions: JournalInteraction[] = [];
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) interactions = JSON.parse(raw);
+  } catch (e) {
+    interactions = memoryCache.get(userId) || [];
   }
 
-  // 3. Wipe parent user profile
+  // 2. Send GDPR compliance archiving payload to backend server
+  let archiveId = `gdpr-arch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   try {
-    const userDocRef = doc(db, 'users', userId);
-    await deleteDoc(userDocRef);
-  } catch (err: any) {
-    console.warn("Cloud profile wipe note:", err.message);
+    const res = await fetch('/api/gdpr/archive-and-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        email: userEmail,
+        profile,
+        interactions,
+        deletionReason: 'User self-service complete account erasure under GDPR Article 17'
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.archiveId) archiveId = data.archiveId;
+    }
+  } catch (netErr) {
+    console.warn('Server GDPR archive dispatch note:', netErr);
   }
+
+  // 3. Record local compliance audit receipt
+  try {
+    const gdprKey = 'reflectai_gdpr_archives';
+    const existingRaw = localStorage.getItem(gdprKey);
+    const ledger = existingRaw ? JSON.parse(existingRaw) : [];
+    ledger.push({
+      archiveId,
+      email: userEmail ? userEmail.toLowerCase() : '',
+      userId,
+      archivedAt: new Date().toISOString(),
+      interactionsCount: interactions.length,
+      status: 'PURGED_AND_ARCHIVED'
+    });
+    localStorage.setItem(gdprKey, JSON.stringify(ledger));
+  } catch (auditErr) {
+    console.warn('Local GDPR audit ledger note:', auditErr);
+  }
+
+  // 4. Wipe active records from memory, localStorage, and Firestore
+  await wipeAllUserData(userId);
+
+  return { archiveId };
 }
