@@ -100,6 +100,168 @@ app.get("/api/maps-config.js", (req, res) => {
   res.send(`window.__GOOGLE_MAPS_API_KEY__ = ${JSON.stringify(mapsApiKey)};`);
 });
 
+// Curated peaceful sanctuaries and iconic locations database for instant matching
+const SANCTUARY_DATABASE = [
+  { id: "kyoto-arashiyama", name: "Kyoto Bamboo Grove & Arashiyama", formattedAddress: "Ukyo Ward, Kyoto, Kansai, Japan", latitude: 35.0165, longitude: 135.6713, type: "Zen Sanctuary" },
+  { id: "big-sur", name: "Big Sur Coastline", formattedAddress: "Highway 1, Monterey County, California, USA", latitude: 36.2704, longitude: -121.8081, type: "Coastal Sanctuary" },
+  { id: "central-park", name: "Central Park", formattedAddress: "Manhattan, New York City, NY, USA", latitude: 40.7828, longitude: -73.9654, type: "Urban Sanctuary" },
+  { id: "lake-district", name: "Lake District National Park", formattedAddress: "Cumbria, England, United Kingdom", latitude: 54.4609, longitude: -3.0886, type: "Lakeside Reserve" },
+  { id: "mount-fuji", name: "Mount Fuji Foothills & Five Lakes", formattedAddress: "Shizuoka & Yamanashi Prefectures, Japan", latitude: 35.3606, longitude: 138.7274, type: "Sacred Mountain" },
+  { id: "banff-lake-louise", name: "Banff National Park & Lake Louise", formattedAddress: "Alberta Rocky Mountains, Canada", latitude: 51.4254, longitude: -116.1773, type: "Alpine Retreat" },
+  { id: "ubud-bali", name: "Ubud Sacred Terraces & Retreat", formattedAddress: "Gianyar, Bali, Indonesia", latitude: -8.5194, longitude: 115.2635, type: "Spiritual Haven" },
+  { id: "sedona", name: "Sedona Red Rock State Park", formattedAddress: "Yavapai County, Arizona, USA", latitude: 34.8217, longitude: -111.8327, type: "Vortex Sanctuary" },
+  { id: "lake-como", name: "Lake Como & Bellagio", formattedAddress: "Lombardy, Italy", latitude: 45.9872, longitude: 9.2625, type: "Lakeside Haven" },
+  { id: "santorini-oia", name: "Santorini Oia Caldera", formattedAddress: "Cyclades, Aegean Islands, Greece", latitude: 36.4618, longitude: 25.3753, type: "Island Sanctuary" },
+  { id: "yosemite", name: "Yosemite Valley & Cathedral Rocks", formattedAddress: "Mariposa County, California, USA", latitude: 37.7456, longitude: -119.5936, type: "National Park" },
+  { id: "golden-gate-park", name: "Golden Gate Park & Japanese Tea Garden", formattedAddress: "San Francisco, California, USA", latitude: 37.7702, longitude: -122.4702, type: "Botanical Garden" },
+  { id: "hyde-park", name: "Hyde Park & Serpentine Lake", formattedAddress: "London, England, United Kingdom", latitude: 51.5073, longitude: -0.1657, type: "Royal Park" },
+  { id: "jardin-luxembourg", name: "Jardin du Luxembourg", formattedAddress: "6th Arrondissement, Paris, France", latitude: 48.8462, longitude: 2.3371, type: "Historic Garden" },
+  { id: "shinjuku-gyoen", name: "Shinjuku Gyoen National Garden", formattedAddress: "Shinjuku, Tokyo, Japan", latitude: 35.6852, longitude: 139.7101, type: "Imperial Garden" },
+  { id: "lake-tahoe", name: "Lake Tahoe Emerald Bay", formattedAddress: "El Dorado County, California, USA", latitude: 38.9539, longitude: -120.1004, type: "Alpine Lake" },
+  { id: "maui-hana", name: "Maui Hana Coastline & Bamboo Trail", formattedAddress: "Maui, Hawaii, USA", latitude: 20.7884, longitude: -155.9904, type: "Tropical Retreat" },
+  { id: "grand-canyon", name: "Grand Canyon South Rim", formattedAddress: "Coconino County, Arizona, USA", latitude: 36.0544, longitude: -112.1401, type: "Canyon Vista" },
+  { id: "niagara-falls", name: "Niagara Falls", formattedAddress: "Ontario, Canada / NY, USA", latitude: 43.0799, longitude: -79.0747, type: "Waterfall Sanctuary" },
+  { id: "zermatt-matterhorn", name: "Zermatt & Matterhorn Glacier", formattedAddress: "Valais, Switzerland", latitude: 45.9763, longitude: 7.7491, type: "Alpine Vista" },
+  { id: "joshua-tree", name: "Joshua Tree Hidden Valley", formattedAddress: "Riverside County, California, USA", latitude: 34.0122, longitude: -116.1684, type: "Desert Solitude" },
+  { id: "cliffs-of-moher", name: "Cliffs of Moher", formattedAddress: "County Clare, Ireland", latitude: 52.9715, longitude: -9.4265, type: "Coastal Cliffs" },
+  { id: "milford-sound", name: "Milford Sound & Fiordland", formattedAddress: "Southland, South Island, New Zealand", latitude: -44.6714, longitude: 167.9262, type: "Fjord Sanctuary" },
+  { id: "acadia-cadillac", name: "Acadia National Park & Cadillac Mtn", formattedAddress: "Mount Desert Island, Maine, USA", latitude: 44.3517, longitude: -68.2272, type: "Ocean Vista" },
+  { id: "table-mountain", name: "Table Mountain Sanctuary", formattedAddress: "Cape Town, Western Cape, South Africa", latitude: -33.9628, longitude: 18.4098, type: "Mountain Plateau" },
+  { id: "plitvice-lakes", name: "Plitvice Lakes Cascades", formattedAddress: "Lika-Senj County, Croatia", latitude: 44.8654, longitude: 15.5820, type: "Lake Terraces" },
+  { id: "cinque-terre", name: "Cinque Terre Coastal Trail", formattedAddress: "Liguria, Italy", latitude: 44.1461, longitude: 9.6544, type: "Mediterranean Haven" },
+  { id: "amalfi-positano", name: "Amalfi Coast & Positano", formattedAddress: "Campania, Italy", latitude: 40.6281, longitude: 14.4850, type: "Coastal Haven" },
+  { id: "zion-national-park", name: "Zion National Park & Virgin River", formattedAddress: "Washington County, Utah, USA", latitude: 37.2691, longitude: -112.9472, type: "Canyon Sanctuary" },
+  { id: "paris-city", name: "Paris", formattedAddress: "Île-de-France, France", latitude: 48.8566, longitude: 2.3522, type: "City" },
+  { id: "london-city", name: "London", formattedAddress: "Greater London, England, United Kingdom", latitude: 51.5074, longitude: -0.1278, type: "City" },
+  { id: "tokyo-city", name: "Tokyo", formattedAddress: "Kanto Region, Japan", latitude: 35.6762, longitude: 139.6503, type: "City" },
+  { id: "sydney-city", name: "Sydney", formattedAddress: "New South Wales, Australia", latitude: -33.8688, longitude: 151.2093, type: "City" },
+  { id: "new-york-city", name: "New York City", formattedAddress: "New York, USA", latitude: 40.7128, longitude: -74.0060, type: "City" },
+  { id: "san-francisco-city", name: "San Francisco", formattedAddress: "California, USA", latitude: 37.7749, longitude: -122.4194, type: "City" },
+  { id: "kyoto-city", name: "Kyoto", formattedAddress: "Kyoto Prefecture, Japan", latitude: 35.0116, longitude: 135.7681, type: "City" },
+  { id: "rome-city", name: "Rome", formattedAddress: "Lazio, Italy", latitude: 41.9028, longitude: 12.4964, type: "City" },
+  { id: "barcelona-city", name: "Barcelona", formattedAddress: "Catalonia, Spain", latitude: 41.3851, longitude: 2.1734, type: "City" },
+  { id: "vancouver-city", name: "Vancouver", formattedAddress: "British Columbia, Canada", latitude: 49.2827, longitude: -123.1207, type: "City" },
+  { id: "singapore-city", name: "Singapore", formattedAddress: "Republic of Singapore", latitude: 1.3521, longitude: 103.8198, type: "City" },
+  { id: "seattle-city", name: "Seattle", formattedAddress: "Washington, USA", latitude: 47.6062, longitude: -122.3321, type: "City" },
+  { id: "amsterdam-city", name: "Amsterdam", formattedAddress: "North Holland, Netherlands", latitude: 52.3676, longitude: 4.9041, type: "City" },
+  { id: "honolulu-city", name: "Honolulu", formattedAddress: "Oahu, Hawaii, USA", latitude: 21.3069, longitude: -157.8583, type: "City" }
+];
+
+// Simple in-memory cache for fast search queries
+const placeAutocompleteCache = new Map<string, { timestamp: number; data: any[] }>();
+
+// Real-time location autocomplete endpoint providing accurate coordinates
+app.get("/api/places/autocomplete", async (req, res) => {
+  try {
+    const rawQuery = typeof req.query.q === "string" ? req.query.q : "";
+    const query = rawQuery.trim().toLowerCase();
+
+    if (!query || query.length < 2) {
+      res.json([]);
+      return;
+    }
+
+    // Check in-memory cache (TTL: 10 minutes)
+    const cached = placeAutocompleteCache.get(query);
+    if (cached && Date.now() - cached.timestamp < 10 * 60 * 1000) {
+      res.json(cached.data);
+      return;
+    }
+
+    const results: Array<{
+      id: string;
+      name: string;
+      formattedAddress: string;
+      latitude: number;
+      longitude: number;
+      type: string;
+    }> = [];
+    const seenCoordinates = new Set<string>();
+
+    const addResult = (item: {
+      id: string;
+      name: string;
+      formattedAddress: string;
+      latitude: number;
+      longitude: number;
+      type?: string;
+    }) => {
+      const coordKey = `${item.latitude.toFixed(3)},${item.longitude.toFixed(3)}`;
+      if (!seenCoordinates.has(coordKey) && results.length < 8) {
+        seenCoordinates.add(coordKey);
+        results.push({
+          id: item.id,
+          name: item.name,
+          formattedAddress: item.formattedAddress,
+          latitude: Number(item.latitude),
+          longitude: Number(item.longitude),
+          type: item.type || "Location"
+        });
+      }
+    };
+
+    // 1. Check curated sanctuaries first for instant, high-quality matches
+    for (const sanctuary of SANCTUARY_DATABASE) {
+      const nameMatch = sanctuary.name.toLowerCase().includes(query);
+      const addrMatch = sanctuary.formattedAddress.toLowerCase().includes(query);
+      if (nameMatch || addrMatch) {
+        addResult(sanctuary);
+      }
+    }
+
+    // 2. Perform live geocoding lookup via OpenStreetMap Nominatim with safe timeout
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`;
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          "User-Agent": "ReflectAI-Sanctuary/1.0 (puneet.agarwal8898@gmail.com)",
+          "Accept-Language": "en"
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const geoData = await response.json();
+        if (Array.isArray(geoData)) {
+          for (const item of geoData) {
+            const lat = parseFloat(item.lat);
+            const lon = parseFloat(item.lon);
+            if (!isNaN(lat) && !isNaN(lon)) {
+              const displayName = item.display_name || "";
+              const parts = displayName.split(",").map((s: string) => s.trim());
+              const cleanTitle = item.name || parts[0] || query;
+              const formattedSub = parts.slice(1, 4).join(", ") || displayName;
+
+              addResult({
+                id: `osm-${item.place_id || Math.random().toString(36).slice(2)}`,
+                name: cleanTitle,
+                formattedAddress: formattedSub,
+                latitude: lat,
+                longitude: lon,
+                type: item.type ? item.type.charAt(0).toUpperCase() + item.type.slice(1) : "Location"
+              });
+            }
+          }
+        }
+      }
+    } catch (fetchErr: any) {
+      // Non-blocking fallback; curated results will still be returned
+      console.warn("Geocoding fetch non-critical error:", fetchErr.message);
+    }
+
+    // Cache the resolved results
+    placeAutocompleteCache.set(query, { timestamp: Date.now(), data: results });
+    res.json(results);
+  } catch (err: any) {
+    console.error("Autocomplete endpoint error:", err);
+    res.status(500).json({ error: "Failed to fetch place suggestions." });
+  }
+});
+
 // Dynamic client-side Firebase bootstrap script
 // Provides seamless runtime resolution in both development (Vite) and Cloud Run production
 app.get("/api/firebase-config.js", (req, res) => {
