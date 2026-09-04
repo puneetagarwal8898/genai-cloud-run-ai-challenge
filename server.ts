@@ -86,9 +86,18 @@ app.get("/api/config", (req, res) => {
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
     hasFirebaseKey: Boolean(firebaseApiKey),
     hasFirebaseConfigured: Boolean(firebaseApiKey && firebaseProjectId),
+    hasMapsKey: Boolean(process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.MAPS_API_KEY || process.env.VITE_MAPS_API_KEY),
     firebaseConfig: safeFirebaseConfig,
     timestamp: new Date().toISOString()
   });
+});
+
+// Dynamic client-side Google Maps key bootstrap script
+app.get("/api/maps-config.js", (req, res) => {
+  const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.MAPS_API_KEY || process.env.VITE_MAPS_API_KEY || "";
+  res.setHeader("Content-Type", "application/javascript");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.send(`window.__GOOGLE_MAPS_API_KEY__ = ${JSON.stringify(mapsApiKey)};`);
 });
 
 // Dynamic client-side Firebase bootstrap script

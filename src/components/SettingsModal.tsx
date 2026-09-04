@@ -62,6 +62,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
+  // Reset state whenever modal is opened
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab('profile');
+      setDisplayName(userProfile?.displayName || user?.displayName || '');
+      setSelectedAvatar(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
+      setCustomAvatarUrl('');
+      setSaveSuccess(false);
+      setSaveError(null);
+      setShowDeleteConfirm(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -82,11 +95,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           voicePitch: voicePitch,
         }
       });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setIsSaving(false);
+      // Close the modal cleanly upon saving changes without jerky background shifts
+      onClose();
     } catch (err: any) {
       setSaveError(err.message || 'Failed to update preferences. Please try again.');
-    } finally {
       setIsSaving(false);
     }
   };
@@ -106,11 +119,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           voicePitch: voicePitch,
         }
       });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setIsSaving(false);
+      // Close the modal cleanly upon saving preferences
+      onClose();
     } catch (err: any) {
       setSaveError(err.message || 'Failed to update voice preferences.');
-    } finally {
       setIsSaving(false);
     }
   };
