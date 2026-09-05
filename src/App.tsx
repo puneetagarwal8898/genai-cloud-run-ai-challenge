@@ -12,10 +12,11 @@ import { LandingPage } from './components/LandingPage';
 import { Dashboard } from './components/Dashboard';
 import { CursorWaveEffect } from './components/CursorWaveEffect';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { TwoFactorAuthModal } from './components/TwoFactorAuthModal';
 import { validateFirestoreConnection } from './firebase';
 
 function MainApp() {
-  const { user, loading, isDeletingAccount } = useAuth();
+  const { user, loading, isDeletingAccount, pendingTwoFactor, verifyAndCompleteTwoFactor, cancelTwoFactor } = useAuth();
 
   useEffect(() => {
     validateFirestoreConnection();
@@ -44,6 +45,12 @@ function MainApp() {
     <div className="w-full max-w-full overflow-x-hidden min-h-screen relative flex flex-col">
       <CursorWaveEffect />
       {user ? <Dashboard /> : <LandingPage />}
+      <TwoFactorAuthModal
+        isOpen={Boolean(pendingTwoFactor)}
+        userEmail={pendingTwoFactor?.profile.email}
+        onVerify={verifyAndCompleteTwoFactor}
+        onCancel={cancelTwoFactor}
+      />
       {isDeletingAccount && (
         <div
           id="account-deletion-blocker"

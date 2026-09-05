@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   User,
@@ -12,16 +12,25 @@ import {
   Sliders,
   Calendar,
   Key,
-  Loader2
+  Loader2,
+  QrCode,
+  Download,
+  FileText,
+  CheckCircle2,
+  Play,
+  Square
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
+import { CURATED_VOICES, resolveSpeechVoice, previewVoice, VoiceProfile } from '../utils/voiceUtils';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenAbout?: () => void;
   onOpenLegal?: () => void;
+  onOpenTwoFactorSetup?: () => void;
+  onOpenExportPdf?: () => void;
 }
 
 const MINDFUL_AVATARS = [
@@ -33,8 +42,22 @@ const MINDFUL_AVATARS = [
   { id: 'water', name: 'Flowing Stream', url: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?w=150&auto=format&fit=crop&q=80' },
 ];
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onOpenAbout, onOpenLegal }) => {
-  const { user, userProfile, updateUserProfileData, deleteUserAccount, resetPassword } = useAuth();
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  onOpenAbout,
+  onOpenLegal,
+  onOpenTwoFactorSetup,
+  onOpenExportPdf
+}) => {
+  const {
+    user,
+    userProfile,
+    updateUserProfileData,
+    deleteUserAccount,
+    resetPassword,
+    disableTwoFactorAuth
+  } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security'>('profile');
 
@@ -47,11 +70,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [ambientSound, setAmbientSound] = useState(userProfile?.preferences?.ambientSound ?? userProfile?.preferences?.ambientSoundEnabled ?? true);
   const [voiceRate, setVoiceRate] = useState(userProfile?.preferences?.voiceRate ?? userProfile?.preferences?.voiceSpeed ?? 0.95);
   const [voicePitch, setVoicePitch] = useState(userProfile?.preferences?.voicePitch || 1.0);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(() => {
+    return userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id') || CURATED_VOICES[0].id;
+  });
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
 
   // States
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // 2FA state
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+  const [twoFactorNotice, setTwoFactorNotice] = useState<string | null>(null);
 
   // Delete flow
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -71,6 +102,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       setDisplayName(userProfile?.displayName || user?.displayName || '');
       setSelectedAvatar(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
       setCustomAvatarUrl('');
+      setSelectedVoiceId(userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id') || CURATED_VOICES[0].id);
+      setPreviewingVoiceId(null);
+      setTwoFactorNotice(null);
       setSaveSuccess(false);
       setSaveError(null);
       setShowDeleteConfirm(false);
@@ -78,12 +112,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       setDeletePassword('');
       setDeleteError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, userProfile, user]);
 
   // Handle Escape key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && !isDeleting) {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
         onClose();
       }
     };
@@ -97,6 +134,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   if (!isOpen) return null;
 
+  const handlePreviewVoice = (voiceProfile: VoiceProfile) => {
+    if (previewingVoiceId === voiceProfile.id) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setPreviewingVoiceId(null);
+      return;
+    }
+    setPreviewingVoiceId(voiceProfile.id);
+    const resolved = resolveSpeechVoice(voiceProfile.keywords[0], voiceProfile.gender);
+    previewVoice(resolved, voiceRate, voicePitch, () => {
+      setPreviewingVoiceId(null);
+    });
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -104,6 +156,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setSaveError(null);
 
     try {
+      const matchedVoice = CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
       await updateUserProfileData({
         displayName: displayName.trim() || 'Mindful Soul',
         photoURL: customAvatarUrl.trim() || selectedAvatar,
@@ -113,10 +166,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           voiceRate,
           voiceSpeed: voiceRate,
           voicePitch: voicePitch,
+          selectedVoiceId,
+          selectedVoiceURI: matchedVoice.keywords[0],
+          selectedVoiceGender: matchedVoice.gender
         }
       });
       setIsSaving(false);
-      // Close the modal cleanly upon saving changes without jerky background shifts
       onClose();
     } catch (err: any) {
       setSaveError(err.message || 'Failed to update preferences. Please try again.');
@@ -130,6 +185,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setSaveError(null);
 
     try {
+      const matchedVoice = CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
       await updateUserProfileData({
         preferences: {
           ambientSound,
@@ -137,14 +193,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           voiceRate,
           voiceSpeed: voiceRate,
           voicePitch: voicePitch,
+          selectedVoiceId,
+          selectedVoiceURI: matchedVoice.keywords[0],
+          selectedVoiceGender: matchedVoice.gender
         }
       });
+      localStorage.setItem('reflectai_selected_voice_id', selectedVoiceId);
+      localStorage.setItem('reflectai_selected_voice_uri', matchedVoice.keywords[0]);
       setIsSaving(false);
-      // Close the modal cleanly upon saving preferences
       onClose();
     } catch (err: any) {
       setSaveError(err.message || 'Failed to update voice preferences.');
       setIsSaving(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (!window.confirm('Are you sure you want to disable two-factor authentication? This will remove 2FA protection from your reflections.')) {
+      return;
+    }
+    setIsDisabling2FA(true);
+    setTwoFactorNotice(null);
+    try {
+      await disableTwoFactorAuth();
+      setTwoFactorNotice('Two-factor authentication has been successfully disabled.');
+    } catch (err: any) {
+      setTwoFactorNotice(err?.message || 'Failed to disable two-factor authentication.');
+    } finally {
+      setIsDisabling2FA(false);
     }
   };
 
@@ -563,6 +639,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 </button>
               </div>
 
+              {/* Narration Voice Selection */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Narration Voice
+                  </label>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    Select your preferred mindful guide
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {CURATED_VOICES.map((voice) => {
+                    const isSelected = selectedVoiceId === voice.id;
+                    const isPlaying = previewingVoiceId === voice.id;
+
+                    return (
+                      <div
+                        key={voice.id}
+                        id={`voice-option-${voice.id}`}
+                        onClick={() => setSelectedVoiceId(voice.id)}
+                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between gap-2.5 ${
+                          isSelected ? 'ring-2' : 'hover:opacity-90'
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-light)' : 'var(--bg-card-elevated)',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border-color)',
+                          boxShadow: isSelected ? '0 0 10px var(--accent-glow)' : 'none'
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                {voice.name}
+                              </p>
+                              <span
+                                className="text-[10px] px-1.5 py-0.2 rounded-full font-medium capitalize"
+                                style={{
+                                  backgroundColor: 'var(--bg-card)',
+                                  color: 'var(--text-muted)',
+                                  border: '1px solid var(--border-color)'
+                                }}
+                              >
+                                {voice.gender}
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--accent)' }}>
+                              {voice.tone}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            id={`preview-voice-${voice.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreviewVoice(voice);
+                            }}
+                            className="p-1.5 rounded-lg border text-xs flex items-center gap-1 transition cursor-pointer hover:opacity-80 shrink-0"
+                            style={{
+                              backgroundColor: 'var(--bg-card)',
+                              borderColor: 'var(--border-color)',
+                              color: isPlaying ? 'var(--accent)' : 'var(--text-primary)'
+                            }}
+                            title={isPlaying ? 'Stop voice sample' : 'Listen to voice sample'}
+                          >
+                            {isPlaying ? (
+                              <>
+                                <Square className="w-3 h-3 fill-current" />
+                                <span className="text-[10px] font-medium">Stop</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3 h-3 fill-current" />
+                                <span className="text-[10px] font-medium">Sample</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        <p className="text-[11px] leading-relaxed line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                          {voice.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Voice Speed Slider */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -630,6 +796,140 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   You retain complete ownership over all your journal entries and personal data
                 </p>
+              </div>
+
+              {/* Two-Factor Authentication (2FA) Recommendation & Status */}
+              <div
+                id="two-factor-auth-settings-card"
+                className="p-4 rounded-xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--bg-card-elevated)',
+                  borderColor: userProfile?.twoFactorEnabled ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className={`w-4 h-4 ${userProfile?.twoFactorEnabled ? 'text-emerald-500' : ''}`} style={!userProfile?.twoFactorEnabled ? { color: 'var(--accent)' } : undefined} />
+                    <span className="text-xs sm:text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Two-Factor Authentication (2FA)
+                    </span>
+                  </div>
+                  {userProfile?.twoFactorEnabled ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="w-3 h-3" /> Enabled
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {userProfile?.twoFactorEnabled
+                    ? 'Your private reflections are protected with Time-Based One-Time Passwords (TOTP). Signing in and exporting reflections requires entering the 6-digit code from your authenticator app.'
+                    : 'Prevent unauthorized access to your private reflections. Set up an authenticator app (Google Authenticator, Authy, Apple Passwords, 1Password) to scan a QR code and require a 6-digit code each time you sign in.'}
+                </p>
+
+                {twoFactorNotice && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    {twoFactorNotice}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {userProfile?.twoFactorEnabled ? (
+                    <>
+                      <button
+                        type="button"
+                        id="reconfigure-2fa-btn"
+                        onClick={() => {
+                          onClose();
+                          onOpenTwoFactorSetup?.();
+                        }}
+                        className="px-3.5 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-85 flex items-center gap-1.5"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        <span>Reconfigure QR Code</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="disable-2fa-btn"
+                        disabled={isDisabling2FA}
+                        onClick={handleDisable2FA}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-medium text-red-400 hover:bg-red-500/10 transition cursor-pointer disabled:opacity-50"
+                        style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                      >
+                        {isDisabling2FA ? 'Disabling...' : 'Disable 2FA'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      id="setup-2fa-btn"
+                      onClick={() => {
+                        onClose();
+                        onOpenTwoFactorSetup?.();
+                      }}
+                      className="px-4 py-2 rounded-xl text-white text-xs font-medium transition cursor-pointer hover:opacity-90 shadow-xs flex items-center gap-1.5"
+                      style={{
+                        backgroundColor: 'var(--accent)',
+                        boxShadow: '0 0 10px var(--accent-glow)'
+                      }}
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Set Up Authenticator (QR Code)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* PDF Reflection Export Section */}
+              <div
+                id="export-pdf-settings-card"
+                className="p-4 rounded-xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--bg-card-elevated)',
+                  borderColor: 'var(--border-color)'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-medium text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
+                    <FileText className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                    Export Reflections as PDF
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}>
+                    Local PDF Only
+                  </span>
+                </div>
+
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  Download an archival copy of all your personal reflections locally to your computer in PDF format. For privacy, downloading requires entering your account password and your 6-digit authenticator code.
+                </p>
+
+                <button
+                  type="button"
+                  id="open-export-pdf-modal-btn"
+                  onClick={() => {
+                    onClose();
+                    onOpenExportPdf?.();
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer border flex items-center gap-1.5 hover:opacity-85"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  <Download className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                  <span>Download PDF Archive</span>
+                </button>
               </div>
 
               {/* Password Reset Section */}

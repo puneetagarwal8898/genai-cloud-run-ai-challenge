@@ -45,6 +45,8 @@ import { TimeCapsuleModal } from './TimeCapsuleModal';
 import { LocationSanctuaryModal } from './LocationSanctuaryModal';
 import { AboutModal } from './AboutModal';
 import { LegalModal } from './LegalModal';
+import { TwoFactorSetupModal } from './TwoFactorSetupModal';
+import { ExportPdfModal } from './ExportPdfModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { AudioNarrationPlayer } from './AudioNarrationPlayer';
 import { SanctuaryVoiceInput } from './SanctuaryVoiceInput';
@@ -67,7 +69,8 @@ export const Dashboard: React.FC = () => {
     userProfile,
     signOut,
     resendFirebaseVerificationEmail,
-    reloadUserVerificationStatus
+    reloadUserVerificationStatus,
+    enableTwoFactorAuth
   } = useAuth();
   const { appEnv, setAppEnv, isProductionLocked } = useApp();
 
@@ -101,6 +104,8 @@ export const Dashboard: React.FC = () => {
 
   // Standout Feature Modals & Staging
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState<boolean>(false);
+  const [showExportPdfModal, setShowExportPdfModal] = useState<boolean>(false);
   const [showResonanceMap, setShowResonanceMap] = useState<boolean>(false);
   const [showTimeCapsule, setShowTimeCapsule] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
@@ -194,18 +199,15 @@ export const Dashboard: React.FC = () => {
       modeObserver.observe(modeBarContainerRef.current);
     }
 
-    // Observe Desktop Header Nav container
-    const headerObserver = new ResizeObserver(() => {
-      if (headerNavContainerRef.current) {
-        const containerWidth = headerNavContainerRef.current.clientWidth;
-        // 4 nav buttons with text + tooltips take ~500px at default font size
-        setShowHeaderNavLabels(containerWidth >= 500);
+    // Manage Desktop Header Nav labels: only display full text on wide viewports (1280px+)
+    // to strictly guarantee zero button or text overlap across all devices and zoom levels
+    const updateHeaderCapacity = () => {
+      if (typeof window !== 'undefined') {
+        setShowHeaderNavLabels(window.innerWidth >= 1280);
       }
-    });
-
-    if (headerNavContainerRef.current) {
-      headerObserver.observe(headerNavContainerRef.current);
-    }
+    };
+    updateHeaderCapacity();
+    window.addEventListener('resize', updateHeaderCapacity);
 
     // Observe Composer Actions container (Mic, Tag Place, Time Capsule)
     const composerActionsObserver = new ResizeObserver(() => {
@@ -222,7 +224,7 @@ export const Dashboard: React.FC = () => {
 
     return () => {
       modeObserver.disconnect();
-      headerObserver.disconnect();
+      window.removeEventListener('resize', updateHeaderCapacity);
       composerActionsObserver.disconnect();
     };
   }, []);
@@ -608,13 +610,13 @@ export const Dashboard: React.FC = () => {
     >
       {/* Top Application Bar */}
       <header
-        className="backdrop-blur-md border-b px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between sticky top-0 z-20 transition-colors"
+        className="backdrop-blur-md border-b px-3 sm:px-5 py-2.5 sm:py-3 shrink-0 flex items-center justify-between sticky top-0 z-20 transition-colors w-full flex-nowrap overflow-hidden"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderColor: 'var(--border-color)'
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
             style={{
@@ -672,14 +674,14 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 pl-3 sm:pl-4">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 pl-2 sm:pl-3 shrink-0 flex-nowrap">
           {/* Quick theme selector and light/dark toggle (visible on all screens) */}
           <ThemeSelector />
 
           {/* Desktop Standout Features Nav Cluster (hidden on mobile / small screens) */}
           <div
             ref={headerNavContainerRef}
-            className="hidden lg:flex items-center gap-2 pl-1.5 border-l"
+            className="hidden lg:flex items-center gap-1.5 sm:gap-2 pl-1.5 border-l shrink-0 flex-nowrap"
             style={{ borderColor: 'var(--border-color)' }}
           >
             <ResponsiveIconButton
@@ -1126,7 +1128,7 @@ export const Dashboard: React.FC = () => {
                   <UserIcon className="w-3.5 h-3.5" />
                 </div>
               )}
-              <div className="text-left max-w-[120px] lg:w-[130px] shrink-0">
+              <div className="text-left max-w-[80px] xl:max-w-[120px] shrink-0">
                 <div className="flex items-center gap-1">
                   <p className="text-xs font-semibold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
                     {userProfile?.displayName || "Reflector"}
@@ -1234,27 +1236,31 @@ export const Dashboard: React.FC = () => {
           }}
         >
           <div
-            className="p-3.5 border-b flex items-center justify-between"
+            className="p-3.5 border-b flex items-center justify-between gap-2"
             style={{
               backgroundColor: 'var(--bg-card-elevated)',
               borderColor: 'var(--border-color)'
             }}
           >
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <BookOpen className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <span className="text-xs font-semibold tracking-tight capitalize" style={{ color: 'var(--text-primary)' }}>
-                {getDynamicSidebarTitle()}
-              </span>
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-medium"
-                style={{
-                  backgroundColor: 'var(--bg-canvas)',
-                  color: 'var(--text-secondary)',
-                  border: '1px solid var(--border-color)'
-                }}
-              >
-                {interactions.length}
-              </span>
+            <div className="inline-flex items-center gap-2 min-w-0">
+              <BookOpen className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+              <div className="inline-flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-semibold tracking-tight capitalize truncate" style={{ color: 'var(--text-primary)' }}>
+                  {getDynamicSidebarTitle()}
+                </span>
+                <span
+                  id="sanctuary-reflections-counter"
+                  className="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium inline-flex items-center justify-center shrink-0"
+                  style={{
+                    backgroundColor: 'var(--bg-canvas)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-color)'
+                  }}
+                  title={`${interactions.length} total reflections`}
+                >
+                  {interactions.length}
+                </span>
+              </div>
             </div>
 
             <button
@@ -1668,6 +1674,8 @@ export const Dashboard: React.FC = () => {
                         textToRead={msg.text}
                         voiceRate={userProfile?.preferences?.voiceRate || 0.95}
                         voicePitch={userProfile?.preferences?.voicePitch || 1.0}
+                        selectedVoiceURI={userProfile?.preferences?.selectedVoiceURI}
+                        selectedVoiceGender={userProfile?.preferences?.selectedVoiceGender}
                         ambientSoundEnabled={userProfile?.preferences?.ambientSound ?? true}
                       />
                     )}
@@ -2074,6 +2082,36 @@ export const Dashboard: React.FC = () => {
           setNavigatedFromSettings(true);
           setShowSettingsModal(false);
           setShowLegalModal(true);
+        }}
+        onOpenTwoFactorSetup={() => {
+          setShowTwoFactorSetup(true);
+        }}
+        onOpenExportPdf={() => {
+          setShowExportPdfModal(true);
+        }}
+      />
+
+      {/* Two-Factor Authentication Setup Modal */}
+      <TwoFactorSetupModal
+        isOpen={showTwoFactorSetup}
+        userEmail={userProfile?.email || user?.email || 'reflector@reflectai.internal'}
+        onClose={() => setShowTwoFactorSetup(false)}
+        onSuccess={async (secret) => {
+          await enableTwoFactorAuth(secret);
+          setShowTwoFactorSetup(false);
+          setStatusMessage('Two-Factor Authentication successfully enabled! Your reflections are now protected.');
+        }}
+      />
+
+      {/* PDF Reflection Export Modal */}
+      <ExportPdfModal
+        isOpen={showExportPdfModal}
+        onClose={() => setShowExportPdfModal(false)}
+        interactions={interactions}
+        userProfile={userProfile}
+        onOpenTwoFactorSetup={() => {
+          setShowExportPdfModal(false);
+          setShowTwoFactorSetup(true);
         }}
       />
 

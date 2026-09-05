@@ -26,6 +26,7 @@ import {
 } from '../firebase';
 import { AuthProviderType, UserProfile, UserPreferences } from '../types';
 import { wipeAllUserData, archiveAndWipeUserData } from '../services/journalService';
+import { verifyTotpToken } from '../utils/totp';
 
 export interface PendingVerification {
   email: string;
@@ -44,6 +45,7 @@ interface AuthContextType {
   isDeletingAccount: boolean;
   error: string | null;
   pendingVerification: PendingVerification | null;
+  pendingTwoFactor: { profile: UserProfile } | null;
   lastUsedProvider: AuthProviderType | null;
   signInWithGoogle: (isTestEnv?: boolean) => Promise<void>;
   signInWithTwitter: (isTestEnv?: boolean) => Promise<void>;
@@ -56,6 +58,10 @@ interface AuthContextType {
   reloadUserVerificationStatus: () => Promise<boolean>;
   resendVerificationCode: (email: string, isTestEnv?: boolean) => Promise<{ codeSent: boolean; message: string; previewCode?: string }>;
   cancelEmailVerification: () => void;
+  verifyAndCompleteTwoFactor: (code: string) => Promise<boolean>;
+  cancelTwoFactor: () => void;
+  enableTwoFactorAuth: (secret: string) => Promise<void>;
+  disableTwoFactorAuth: () => Promise<void>;
   signInAsDemoUser: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUserProfileData: (updates: { displayName?: string; photoURL?: string; preferences?: UserPreferences }) => Promise<void>;
@@ -113,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState<PendingVerification | null>(null);
+  const [pendingTwoFactor, setPendingTwoFactor] = useState<{ profile: UserProfile } | null>(null);
   const [lastUsedProvider, setLastUsedProvider] = useState<AuthProviderType | null>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
@@ -220,6 +227,103 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(createMockUser(profile));
   };
 
+  const handleAuthenticationSuccess = (profile: UserProfile) => {
+    // Check if 2FA is active on this account
+    let has2FA = Boolean(profile.twoFactorEnabled && profile.twoFactorSecret);
+    let secret = profile.twoFactorSecret;
+
+    if (!has2FA && profile.email) {
+      try {
+        const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+        if (accountsRaw) {
+          const accounts = JSON.parse(accountsRaw);
+          const emailKey = profile.email.toLowerCase();
+          const acc = accounts[emailKey] || (profile.uid ? accounts[profile.uid] : undefined);
+          if (acc?.profile?.twoFactorEnabled && acc?.profile?.twoFactorSecret) {
+            has2FA = true;
+            secret = acc.profile.twoFactorSecret;
+            profile.twoFactorEnabled = true;
+            profile.twoFactorSecret = secret;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (has2FA && secret) {
+      setPendingTwoFactor({ profile });
+      return;
+    }
+
+    saveActiveSession(profile);
+  };
+
+  const verifyAndCompleteTwoFactor = async (code: string): Promise<boolean> => {
+    if (!pendingTwoFactor || !pendingTwoFactor.profile.twoFactorSecret) {
+      throw new Error('No pending two-factor verification session found.');
+    }
+
+    const isValid = verifyTotpToken(pendingTwoFactor.profile.twoFactorSecret, code);
+    if (!isValid) {
+      return false;
+    }
+
+    saveActiveSession(pendingTwoFactor.profile);
+    setPendingTwoFactor(null);
+    return true;
+  };
+
+  const cancelTwoFactor = () => {
+    setPendingTwoFactor(null);
+  };
+
+  const enableTwoFactorAuth = async (secret: string): Promise<void> => {
+    if (!userProfile) throw new Error('No active user session found.');
+    const updated: UserProfile = {
+      ...userProfile,
+      twoFactorEnabled: true,
+      twoFactorSecret: secret,
+      twoFactorConfiguredAt: new Date().toISOString()
+    };
+    setUserProfile(updated);
+    saveActiveSession(updated);
+
+    try {
+      const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+      if (accountsRaw && userProfile.email) {
+        const accounts = JSON.parse(accountsRaw);
+        const emailKey = userProfile.email.toLowerCase();
+        if (accounts[emailKey]) {
+          accounts[emailKey].profile = updated;
+          localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+        }
+      }
+    } catch (e) {}
+  };
+
+  const disableTwoFactorAuth = async (): Promise<void> => {
+    if (!userProfile) return;
+    const updated: UserProfile = {
+      ...userProfile,
+      twoFactorEnabled: false,
+      twoFactorSecret: undefined,
+      twoFactorConfiguredAt: undefined
+    };
+    setUserProfile(updated);
+    saveActiveSession(updated);
+
+    try {
+      const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+      if (accountsRaw && userProfile.email) {
+        const accounts = JSON.parse(accountsRaw);
+        const emailKey = userProfile.email.toLowerCase();
+        if (accounts[emailKey]) {
+          accounts[emailKey].profile = updated;
+          localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+        }
+      }
+    } catch (e) {}
+  };
+
   const signInWithGoogle = async (isTestEnv = false) => {
     setError(null);
     try {
@@ -244,7 +348,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
-      saveActiveSession(profile);
+      handleAuthenticationSuccess(profile);
     } catch (err: any) {
       console.error("Google Sign-In error:", err);
       if (isTestEnv) {
@@ -259,7 +363,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        saveActiveSession(fallbackProfile);
+        handleAuthenticationSuccess(fallbackProfile);
       } else {
         let msg = err.message || 'Failed to sign in with Google.';
         if (err.code === 'auth/invalid-api-key' || err.code === 'auth/api-key-not-valid' || err.message?.includes('api-key-not-valid')) {
@@ -291,7 +395,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        saveActiveSession(fallbackProfile);
+        handleAuthenticationSuccess(fallbackProfile);
         return;
       }
 
@@ -308,7 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
-      saveActiveSession(profile);
+      handleAuthenticationSuccess(profile);
     } catch (err: any) {
       console.warn("Twitter Sign-In notice:", err.code, err.message);
       let msg = err.message || 'Twitter / X sign-in failed.';
@@ -350,7 +454,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        saveActiveSession(fallbackProfile);
+        handleAuthenticationSuccess(fallbackProfile);
         return;
       }
 
@@ -390,7 +494,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
-      saveActiveSession(profile);
+      handleAuthenticationSuccess(profile);
     } catch (err: any) {
       console.error("LinkedIn Sign-In Raw Error:", {
         code: err.code,
@@ -778,7 +882,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: fbUser.metadata.creationTime || new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        saveActiveSession(profile);
+        handleAuthenticationSuccess(profile);
         return;
       } catch (fbErr: any) {
         if (fbErr.code === 'auth/operation-not-allowed') {
@@ -788,7 +892,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
           const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
           if (accounts[trimmedEmail] && accounts[trimmedEmail].passwordHash === hashPassword(password)) {
-            saveActiveSession(accounts[trimmedEmail].profile);
+            handleAuthenticationSuccess(accounts[trimmedEmail].profile);
             return;
           }
           throw new Error("This account doesn't exist. Please create an account to get started.");
@@ -799,7 +903,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
           const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
           if (accounts[trimmedEmail] && accounts[trimmedEmail].passwordHash === hashPassword(password)) {
-            saveActiveSession(accounts[trimmedEmail].profile);
+            handleAuthenticationSuccess(accounts[trimmedEmail].profile);
             return;
           }
           throw new Error("This account doesn't exist. Please create an account to get started.");
@@ -820,7 +924,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Incorrect password. Please try again.');
     }
 
-    saveActiveSession(account.profile);
+    handleAuthenticationSuccess(account.profile);
   };
 
   const resetPassword = async (email: string) => {
@@ -910,7 +1014,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastActiveAt: new Date().toISOString()
       };
 
-      saveActiveSession(mockProfile);
+      handleAuthenticationSuccess(mockProfile);
     } catch (err: any) {
       setError(err.message || 'Demo test sign in failed.');
     }
@@ -1112,6 +1216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDeletingAccount,
         error,
         pendingVerification,
+        pendingTwoFactor,
         lastUsedProvider,
         signInWithGoogle,
         signInWithTwitter,
@@ -1124,6 +1229,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reloadUserVerificationStatus,
         resendVerificationCode,
         cancelEmailVerification,
+        verifyAndCompleteTwoFactor,
+        cancelTwoFactor,
+        enableTwoFactorAuth,
+        disableTwoFactorAuth,
         signInAsDemoUser,
         signOut,
         updateUserProfileData,

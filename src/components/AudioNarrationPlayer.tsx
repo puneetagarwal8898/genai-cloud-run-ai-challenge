@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, Play, Pause, Sparkles, RefreshCw } from 'lucide-react';
+import { resolveSpeechVoice } from '../utils/voiceUtils';
 
 interface AudioNarrationPlayerProps {
   textToRead: string;
   autoPlay?: boolean;
   voiceRate?: number;
   voicePitch?: number;
+  selectedVoiceURI?: string;
+  selectedVoiceGender?: 'female' | 'male' | 'neutral';
   ambientSoundEnabled?: boolean;
 }
 
@@ -14,6 +17,8 @@ export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
   autoPlay = false,
   voiceRate = 0.95,
   voicePitch = 1.0,
+  selectedVoiceURI,
+  selectedVoiceGender,
   ambientSoundEnabled = true
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -112,16 +117,13 @@ export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
       utterance.rate = voiceRate;
       utterance.pitch = voicePitch;
 
-      // Select gentle natural English voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(
-        (v) =>
-          v.lang.startsWith('en') &&
-          (v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Google UK'))
-      ) || voices.find((v) => v.lang.startsWith('en'));
+      // Select user's chosen voice or gentle natural voice
+      const storedVoiceURI = typeof window !== 'undefined' ? localStorage.getItem('reflectai_selected_voice_uri') || undefined : undefined;
+      const targetVoiceURI = selectedVoiceURI || storedVoiceURI;
+      const resolvedVoice = resolveSpeechVoice(targetVoiceURI, selectedVoiceGender);
 
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
+      if (resolvedVoice) {
+        utterance.voice = resolvedVoice;
       }
 
       utterance.onstart = () => {

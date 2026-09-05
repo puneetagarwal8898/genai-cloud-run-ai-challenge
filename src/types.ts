@@ -29,6 +29,10 @@ export interface UserPreferences {
   voicePitch?: number;
   voiceRate?: number;
   voiceSpeed?: number;
+  selectedVoiceId?: string;
+  selectedVoiceURI?: string;
+  selectedVoiceName?: string;
+  selectedVoiceGender?: 'female' | 'male' | 'neutral';
   ambientSound?: boolean;
   ambientSoundEnabled?: boolean;
   autoReadAloud?: boolean;
@@ -46,6 +50,9 @@ export interface UserProfile {
   createdAt: string;
   lastActiveAt?: string;
   preferences?: UserPreferences;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string;
+  twoFactorConfiguredAt?: string;
 }
 
 export type ReflectionMode = 'reflection' | 'brainstorm' | 'summary' | 'advice';
