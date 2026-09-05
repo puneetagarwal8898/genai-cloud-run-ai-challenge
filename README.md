@@ -220,9 +220,21 @@ gcloud run deploy reflectai \
   --port 3000
 ```
 
-> **Tip**: You can customize the `--region` to any Google Cloud region close to your users (e.g. `us-central1`, `asia-east1`, `europe-west1`).
+> **Why `--allow-unauthenticated` is standard for public web apps:**
+> In Google Cloud Run, `--allow-unauthenticated` controls **Cloud Run IAM ingress** (network layer), allowing public web browsers to reach the website over HTTPS. 
+> - **With `--allow-unauthenticated`**: Normal visitors can access the login page and authenticate using Firebase (Google/LinkedIn/Facebook/Email). All data is protected by Firestore Security Rules and server-side secret isolation.
+> - **With `--no-allow-unauthenticated`**: Cloud Run blocks all public web traffic. Only callers possessing Google Cloud IAM credentials or Google Cloud Identity-Aware Proxy (IAP) can reach the container. (Use this option only if building an internal enterprise tool restricted to corporate employees).
 
-### Step 4: Add Campaign Challenge Label
+### Step 4: (Optional) Injecting Firebase Configuration at Runtime
+You can pass your Firebase project keys directly via Cloud Run environment variables without rebuilding the container:
+
+```bash
+gcloud run services update reflectai \
+  --region europe-west2 \
+  --update-env-vars FIREBASE_API_KEY=YOUR_FIREBASE_WEB_API_KEY,FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
+```
+
+### Step 5: Add Campaign Challenge Label
 ```bash
 gcloud run services update reflectai \
   --update-labels=dev-tutorial=cloud-run-ai-challenge \

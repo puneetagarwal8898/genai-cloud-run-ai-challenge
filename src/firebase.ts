@@ -2,14 +2,35 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 
-// Default project configuration fallback (can be overridden by VITE_FIREBASE_* env vars)
+// Global runtime config declaration
+declare global {
+  interface Window {
+    __FIREBASE_CONFIG__?: {
+      apiKey?: string;
+      authDomain?: string;
+      projectId?: string;
+      storageBucket?: string;
+      messagingSenderId?: string;
+      appId?: string;
+    };
+  }
+}
+
+// Resolve configuration from runtime server injection or build-time environment variables
+const runtimeConfig = typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__ : undefined;
+
+const firebaseApiKey = runtimeConfig?.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "";
+const firebaseProjectId = runtimeConfig?.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
+
+export const isFirebaseConfigured = Boolean(firebaseApiKey && firebaseProjectId);
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyFakeKeyDemoForDevelopmentModeOnly12345",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "reflectai-app.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "reflectai-app",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "reflectai-app.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789012",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789012:web:abcdef123456"
+  apiKey: firebaseApiKey || "UNCONFIGURED_FIREBASE_API_KEY",
+  authDomain: runtimeConfig?.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : "unconfigured.firebaseapp.com"),
+  projectId: firebaseProjectId || "unconfigured-project",
+  storageBucket: runtimeConfig?.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : "unconfigured.appspot.com"),
+  messagingSenderId: runtimeConfig?.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+  appId: runtimeConfig?.appId || import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:0000000000000000000000"
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
