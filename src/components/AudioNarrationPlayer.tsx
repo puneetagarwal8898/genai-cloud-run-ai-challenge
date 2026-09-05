@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, Play, Pause, Sparkles, RefreshCw } from 'lucide-react';
-import { resolveSpeechVoice } from '../utils/voiceUtils';
+import { resolveSpeechVoice, formatTextForNaturalSpeech } from '../utils/voiceUtils';
 
 interface AudioNarrationPlayerProps {
   textToRead: string;
   autoPlay?: boolean;
   voiceRate?: number;
   voicePitch?: number;
+  selectedVoiceId?: string;
   selectedVoiceURI?: string;
   selectedVoiceGender?: 'female' | 'male' | 'neutral';
   ambientSoundEnabled?: boolean;
@@ -15,8 +16,9 @@ interface AudioNarrationPlayerProps {
 export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
   textToRead,
   autoPlay = false,
-  voiceRate = 0.95,
+  voiceRate = 0.92,
   voicePitch = 1.0,
+  selectedVoiceId,
   selectedVoiceURI,
   selectedVoiceGender,
   ambientSoundEnabled = true
@@ -49,11 +51,12 @@ export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
       const gain = audioCtxRef.current.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(432, audioCtxRef.current.currentTime); // 432Hz Miracle / Calming tone
+      osc.frequency.setValueAtTime(432, audioCtxRef.current.currentTime); // 432Hz Calming tone
 
-      // Soft envelope
-      gain.gain.setValueAtTime(0.001, audioCtxRef.current.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.03, audioCtxRef.current.currentTime + 1.5);
+      // Soft envelope with soothing warm volume
+      const now = audioCtxRef.current.currentTime;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(0.065, now + 1.2);
 
       osc.connect(gain);
       gain.connect(audioCtxRef.current.destination);
@@ -68,18 +71,21 @@ export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
 
   const stopAmbientDrone = () => {
     try {
-      if (gainRef.current && audioCtxRef.current) {
-        gainRef.current.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + 0.8);
+      const oldOsc = oscRef.current;
+      const oldGain = gainRef.current;
+      oscRef.current = null;
+      gainRef.current = null;
+
+      if (oldGain && audioCtxRef.current) {
+        oldGain.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + 0.6);
       }
       setTimeout(() => {
         try {
-          oscRef.current?.stop();
-          oscRef.current?.disconnect();
-          gainRef.current?.disconnect();
-          oscRef.current = null;
-          gainRef.current = null;
+          oldOsc?.stop();
+          oldOsc?.disconnect();
+          oldGain?.disconnect();
         } catch (e) {}
-      }, 900);
+      }, 700);
     } catch (e) {}
   };
 
@@ -105,22 +111,21 @@ export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
     } else {
       window.speechSynthesis.cancel();
 
-      // Clean text of markdown asterisks/links for natural narration
-      const cleanNarration = textToRead
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/#{1,6}\s+/g, '')
-        .trim();
+      // Clean text and insert natural human breath pauses
+      const cleanNarration = formatTextForNaturalSpeech(textToRead);
 
       const utterance = new SpeechSynthesisUtterance(cleanNarration);
-      utterance.rate = voiceRate;
-      utterance.pitch = voicePitch;
+      
+      // Safe clamping: preserve organic human formant resonance
+      const safeRate = Math.min(1.15, Math.max(0.80, voiceRate));
+      const safePitch = Math.min(1.08, Math.max(0.92, voicePitch));
+      utterance.rate = safeRate;
+      utterance.pitch = safePitch;
 
       // Select user's chosen voice or gentle natural voice
-      const storedVoiceURI = typeof window !== 'undefined' ? localStorage.getItem('reflectai_selected_voice_uri') || undefined : undefined;
       const storedVoiceId = typeof window !== 'undefined' ? localStorage.getItem('reflectai_selected_voice_id') || undefined : undefined;
-      const targetVoice = selectedVoiceURI || storedVoiceId || storedVoiceURI;
+      const storedVoiceURI = typeof window !== 'undefined' ? localStorage.getItem('reflectai_selected_voice_uri') || undefined : undefined;
+      const targetVoice = selectedVoiceId || storedVoiceId || selectedVoiceURI || storedVoiceURI;
       const resolvedVoice = resolveSpeechVoice(targetVoice, selectedVoiceGender);
 
       if (resolvedVoice) {

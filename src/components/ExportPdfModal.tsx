@@ -33,7 +33,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [refreshHistory, setRefreshHistory] = useState(0);
 
-  const has2FA = Boolean(userProfile?.twoFactorEnabled && userProfile?.twoFactorSecret);
+  const has2FA = Boolean(userProfile?.twoFactorEnabled);
   const isEmailAuth = userProfile?.authProvider === 'email';
 
   useEffect(() => {
@@ -104,14 +104,34 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
         return;
       }
 
-      const isValidTotp = verifyTotpToken(userProfile!.twoFactorSecret!, cleanCode);
+      let isValidTotp = false;
+      if (userProfile?.twoFactorSecret) {
+        isValidTotp = verifyTotpToken(userProfile.twoFactorSecret, cleanCode);
+      } else {
+        try {
+          const res = await fetch('/api/auth/2fa/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: userProfile?.email,
+              uid: userProfile?.uid,
+              code: cleanCode
+            })
+          });
+          const data = await res.json();
+          isValidTotp = Boolean(data.verified);
+        } catch {
+          isValidTotp = false;
+        }
+      }
+
       if (!isValidTotp) {
         setError('Invalid 2FA authenticator code. Please check your authenticator app and try again.');
         return;
       }
     } else {
-      // If user has not enabled 2FA, require password verification confirmation
-      if (!accountPassword.trim()) {
+      // If user has not enabled 2FA, require password verification confirmation for email accounts
+      if (isEmailAuth && !accountPassword.trim()) {
         setError('Please enter your authorization password to confirm identity.');
         return;
       }
@@ -287,36 +307,38 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
                 </div>
               </div>
 
-              {/* Account Password verification */}
-              <div>
-                <label
-                  htmlFor="export-account-password-input"
-                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  2. Account Verification Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="export-account-password-input"
-                    type="password"
-                    placeholder="Enter your account login password"
-                    value={accountPassword}
-                    onChange={(e) => {
-                      setAccountPassword(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    disabled={isExporting}
-                    className="w-full text-xs py-2.5 px-3.5 pr-10 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-                    style={{
-                      backgroundColor: 'var(--bg-card-elevated)',
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
-                  <Lock className="absolute right-3.5 top-3 w-4 h-4 opacity-40 pointer-events-none" />
+              {/* Account Password verification (only for email password accounts without 2FA) */}
+              {isEmailAuth && !has2FA && (
+                <div>
+                  <label
+                    htmlFor="export-account-password-input"
+                    className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    2. Account Verification Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="export-account-password-input"
+                      type="password"
+                      placeholder="Enter your account login password"
+                      value={accountPassword}
+                      onChange={(e) => {
+                        setAccountPassword(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      disabled={isExporting}
+                      className="w-full text-xs py-2.5 px-3.5 pr-10 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                      style={{
+                        backgroundColor: 'var(--bg-card-elevated)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)'
+                      }}
+                    />
+                    <Lock className="absolute right-3.5 top-3 w-4 h-4 opacity-40 pointer-events-none" />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 2FA input */}
               {has2FA ? (

@@ -43,21 +43,23 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
 
 ## Application Features
 
-- **4 Guided Reflection Archetypes**:
-  - 🌿 **Deep Reflection**: Empathetic, introspective analysis and gentle cognitive reframing.
-  - 💡 **Creative Brainstorm**: Expansive ideation, exploratory prompts, and innovative avenues.
-  - 📝 **Structured Summary**: Concise bullet points, core takeaways, and actionable next steps.
-  - 🧭 **Compassionate Guidance**: Practical strategies, grounding exercises, and thoughtful encouragement.
-- **Multi-Turn Conversation Trails**:
+- **4 Guided Reflection Modes (Auto-Scaling & Responsive)**:
+  - 💡 **Brainstorm**: Creative ideas, angles, and exploratory possibilities.
+  - 🌿 **Reflection**: Empathetic, introspective analysis, and mindful cognitive reframing.
+  - 📝 **Summary**: Distill core essence, concise bullet points, and actionable main takeaways.
+  - 🧭 **Advice**: Practical strategies, grounding exercises, compassionate guidance, and clear next steps.
+  - *Dynamic Viewport Scaling*: On wide/desktop screens ($\ge 500\text{px}$ container), full text labels display seamlessly; on mobile devices or smaller window sizes ($< 500\text{px}$), tabs dynamically collapse into clean icon-only buttons with rich floating tooltips and ARIA accessibility labels without any awkward wrapping or header collision.
+- **Resonant Multi-Turn Thought Exploration & Follow-Up Chips**:
   - Ask follow-up questions to any reflection without losing context.
-  - Dynamic AI suggestion chips provide immediate starting points for deeper introspection.
-  - Typing in the composer automatically clears chips to keep the workspace clean.
+  - Meaningful, empathetic follow-up chips phrased in the user's authentic first-person voice (e.g., *"How can I set clearer boundaries around my workload and deadlines?"*, *"What small step can I take today to ease this heavy pressure?"*) guide organic conversation.
+  - Tactile micro-interactions with amber status indicators, keyboard accessibility, and auto-dismiss upon typing in the composer.
 - **Polite Verification Gate**:
   - Unverified email users can freely log in and explore their sanctuary, while politely prompted to verify their account before initiating new AI reflections.
 - **Aesthetic Sanctuary Themes**:
   - **Dark Themes**: Midnight Violet, Nordic Slate, Candlelight Amber, Sage Calm.
   - **Daylight Themes**: Warm Paper, Solar Daylight, Daylight Sage.
 - **Mobile-First Responsive Design**:
+  - Adaptive Mobile View Switcher: Seamlessly toggles between **Reflect & Dialogue** and **History** on compact mobile viewports, maximizing vertical workspace.
   - Consolidated 4-bit mobile header: Single-button enhancements menu (`Wand2`), compact user avatar with status badge, modal trigger, and quick theme toggle.
   - Zero horizontal scrolling across any viewport size, from ultra-compact smartphones (320px+) to 4K ultra-wide monitors.
 - **Flexible & Secure Authentication**:
@@ -80,14 +82,15 @@ The sanctuary incorporates specialized, purpose-built mindfulness and introspect
    - Categorizes thoughts into 6 emotional mood orbits: *Calm, Clarity, Gratitude, Courage, Growth, and Reflective*.
    - Dynamic resonance links connect emotionally aligned thoughts across time with interactive mood distributions and node inspection drawers.
 
-2. **Sanctuary Voice Mode (4 Distinct Calming Voices & 432Hz Ambient Drone)**:
+2. **Sanctuary Voice Mode (5 Natural Soothing Voices & 432Hz Ambient Synthesizer)**:
    - Built-in browser speech recognition transcribing reflections directly into the reflection composer with live status indicators.
-   - Overhauled with **4 distinct, soothing, and relaxing voice profiles** crafted specifically for contemplation and mindfulness:
-     - 🌸 **Maya** (Gentle & Introspective — Soft, empathetic American cadence)
-     - 🌲 **David** (Grounding & Centered — Deep, comforting British cadence)
-     - 🌊 **Claire** (Airy & Peaceful — Serene, tranquil Australian cadence)
-     - 🌾 **Julian** (Warm & Composed — Steady, reassuring Canadian cadence)
-   - Contemplative text-to-speech narration paired with an ambient 432Hz sine-wave healing drone, live audio wave visualizer, and instant voice preview sample clips in Settings.
+   - **5 Natural, Relaxing Voice Profiles** with Indian origin and Sanskrit/Vedic mythological naming, crafted for soothing human-like cadence:
+     - 🌸 **Ananya** (Sanskrit: *"Unique & Serene Presence"* — Soft, warm and tranquil melodic cadence for peaceful emotional clarity)
+     - ✨ **Tara** (Sanskrit & Vedic: *"Guiding Star of Compassion"* — British English soft cadence for unhurried breathing & restorative presence)
+     - 🌊 **Mira** (Sanskrit: *"Ocean of Grace & Mindful Devotion"* — Bright, mindful and uplifting intonation for gratitude and self-compassion)
+     - 🌲 **Bodhi** (Sanskrit: *"Awakening, Deep Insight & Stillness"* — Classic British English baritone with measured cadence for centered reflection)
+     - 🌌 **Varun** (Vedic Mythology: *"Lord of Cosmic Waters & Deep Peace"* — Deep, warm and resonant bass for evening decompression)
+   - **Multi-Harmonic 432Hz Ambient Synthesizer**: Real-time Web Audio API sine-wave generator with gentle low-pass smoothing; includes an interactive **"Listen to 432Hz"** live preview button with animated soundwaves in Settings.
 
 3. **Password-Secured PDF Archive & Download History Tracking**:
    - Download an archival PDF containing all reflections, tags, emotional orbits, and conversational follow-ups.
@@ -106,12 +109,12 @@ The sanctuary incorporates specialized, purpose-built mindfulness and introspect
 
 6. **Location-Aware Sanctuary Journey**:
    - Anchors reflections in physical space using Google Maps Platform (`@vis.gl/react-google-maps`).
-   - Pin device GPS coordinates or pick curated meditative sanctuaries (Kyoto Bamboo Grove, Big Sur Coastline, Lake Louise).
+   - Pin device GPS coordinates or pick curated meditative sanctuaries (Kyoto Bamboo Grove, Big Sur Coastline, Lake Louise) using the amber-accented Map Pin action.
    - Filter and explore reflections geographically on an interactive map.
 
 7. **Account Settings, Theme Engine & Data Sovereignty**:
    - 7 handcrafted color schemes (Midnight Violet, Nordic Slate, Candlelight Amber, Sage Calm, Warm Paper, Solar Daylight, Daylight Sage) with an elevated z-index dropdown that never clips behind content.
-   - Customize display name, mindful avatar, speech rate, pitch, and default voice profile.
+   - Customize display name, mindful avatar, speech rate, pitch, default voice profile, and test the 432Hz ambient drone.
    - "About Sanctuary", "Privacy Policy", and "Terms of Service" accessible directly from the home screen for non-logged-in visitors as well as logged-in members.
    - Full GDPR-compliant account deletion workflow with complete Firestore interaction and export log wipes.
 
@@ -234,19 +237,35 @@ VITE_GOOGLE_MAPS_API_KEY=""
 npm run dev
 ```
 
-Visit **`http://localhost:3000`** in your browser. The application boots with hot reloading and server proxying.
+Visit **`http://localhost:3000`** in your browser. The application boots with `tsx server.ts` hosting the Express backend and mounting Vite in middleware mode.
 
-### 6. Build and Run Production Locally
+> **💡 Instant Local Testing (Without Firebase Credentials):**
+> If you are evaluating the app locally before setting up your own Firebase project, keep `APP_ENV="test"`. The app provides a **One-Click Test Sandbox Account** directly on the landing page, allowing you to immediately explore all UI features, test the 5 soothing voices, try the 432Hz ambient synthesizer, and generate reflections using your `GEMINI_API_KEY`.
+
+### 6. Verify Backend & API Health
+To check that the server is operational and Gemini API connectivity is active:
 ```bash
-# Type check with TypeScript compiler
+# Health check endpoint
+curl http://localhost:3000/api/health
+# Response: {"status":"ok","hasGeminiKey":true,"timestamp":"..."}
+
+# Configuration status (sanitized metadata)
+curl http://localhost:3000/api/config
+```
+
+### 7. Build and Run Production Locally
+Before deploying, you can test the production build on your local machine:
+```bash
+# 1. Type check with TypeScript compiler
 npm run lint
 
-# Build production client bundle and bundle server.ts with esbuild into dist/server.cjs
+# 2. Build production client bundle with Vite and bundle server.ts with esbuild into dist/server.cjs
 npm run build
 
-# Launch the compiled CommonJS server
+# 3. Launch the compiled, self-contained CommonJS production server
 npm run start
 ```
+Open `http://localhost:3000` to verify the compiled production build.
 
 ---
 
@@ -310,7 +329,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 *(Alternatively, run the included helper script: `./setup-iam.sh`)*
 
 ### Step 4: Deploy to Cloud Run
-Run this single command from your project root. Google Cloud Build will automatically containerize the application and deploy it to Cloud Run:
+Run this single command from your project root. Google Cloud Build will automatically containerize the application, compile the client and server assets, and deploy it to Cloud Run:
 
 ```bash
 gcloud run deploy reflectai \
@@ -320,24 +339,39 @@ gcloud run deploy reflectai \
   --allow-unauthenticated \
   --set-env-vars APP_ENV=production,NODE_ENV=production \
   --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest \
-  --port 3000
+  --port 3000 \
+  --memory 1Gi \
+  --cpu 1 \
+  --min-instances 0 \
+  --max-instances 10 \
+  --timeout 300s
 ```
 
+> **⚠️ Critical Requirement — Port 3000 (`--port 3000`):**
+> Google Cloud Run defaults to expecting the container to listen on port `8080` unless told otherwise. ReflectAI Sanctuary's Express server is configured to bind to port `3000` (`app.listen(3000, "0.0.0.0")`). Specifying `--port 3000` informs Cloud Run's ingress proxy to route inbound HTTPS traffic directly to port 3000, ensuring container health probes succeed without timing out.
+>
 > **Why `--allow-unauthenticated` is standard for public web apps:**
 > In Google Cloud Run, `--allow-unauthenticated` controls **Cloud Run IAM ingress** (network layer), allowing public web browsers to reach the website over HTTPS. 
 > - **With `--allow-unauthenticated`**: Normal visitors can access the login page and authenticate using Firebase (Google/LinkedIn/Twitter/Email). All data is protected by Firestore Security Rules and server-side secret isolation.
 > - **With `--no-allow-unauthenticated`**: Cloud Run blocks all public web traffic. Only callers possessing Google Cloud IAM credentials or Google Cloud Identity-Aware Proxy (IAP) can reach the container.
 
-### Step 5: (Optional) Injecting Firebase Configuration at Runtime
-You can pass your Firebase project keys directly via Cloud Run environment variables without rebuilding the container:
+### Step 5: Authorize Cloud Run Domain in Firebase (Mandatory for Auth)
+Once Cloud Run completes deployment, copy your service URL (e.g. `https://reflectai-952579076488.asia-south1.run.app`):
+1. Open [Firebase Console](https://console.firebase.google.com/) &rarr; select your project.
+2. Navigate to **Authentication** &rarr; **Settings** tab &rarr; **Authorized domains**.
+3. Click **Add domain**, enter your Cloud Run host domain (e.g., `reflectai-952579076488.asia-south1.run.app`), and click **Add**.
+4. *(Omitting this step causes Firebase OAuth popup providers to fail with an `auth/unauthorized-domain` error).*
+
+### Step 6: Inject Firebase Configuration at Runtime (No Rebuild Required)
+ReflectAI Sanctuary includes a dynamic client bootstrap service (`/api/firebase-config.js`) that injects Firebase credentials from Cloud Run environment variables directly at runtime. You can attach your Firebase project keys at any time without rebuilding the container:
 
 ```bash
 gcloud run services update reflectai \
   --region asia-south1 \
-  --update-env-vars FIREBASE_API_KEY=YOUR_FIREBASE_WEB_API_KEY,FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
+  --update-env-vars FIREBASE_API_KEY="YOUR_FIREBASE_WEB_API_KEY",FIREBASE_PROJECT_ID="YOUR_FIREBASE_PROJECT_ID",FIREBASE_AUTH_DOMAIN="YOUR_PROJECT_ID.firebaseapp.com"
 ```
 
-### Step 6: Add Campaign Challenge Label
+### Step 7: Add Campaign Challenge Label (Optional)
 ```bash
 gcloud run services update reflectai \
   --update-labels=dev-tutorial=cloud-run-ai-challenge \
@@ -510,21 +544,23 @@ The following step-by-step test matrix verifies every critical user interaction 
 | **2. Production Environment Locking** | Deploy with `APP_ENV=production` or click the `🚀` mode button. | The test sandbox card is removed, the `🧪`/`🚀` switcher is hidden, and the **SSL Encrypted** badge is displayed. |
 | **3. Email Sign-Up & Verification Link** | Enter email/password on Sign Up and click **Create Sanctuary Account**. | Account registers in Firebase; Google Firebase dispatches a verification link to your inbox; sanctuary dashboard shows the verification banner until verified. |
 | **4. Polite Email Verification Gate** | With an unverified email account, try submitting a reflection in the composer or clicking a suggestion chip. | A polite modal dialog appears explaining that email verification is required to converse with the AI, with buttons to resend the link or confirm verification. |
-| **5. AI Reflection & Follow-Up Chips** | Submit a reflection prompt in the composer. | AI returns a thoughtful response with emotional mood categorization; 3 intelligent follow-up suggestions appear. Typing in composer immediately clears suggestions. |
+| **5. AI Reflection & Resonant Follow-Up Chips** | Submit a reflection prompt in the composer. | AI returns an empathetic response with emotional mood categorization; 3 deeply resonant, first-person follow-up questions appear (e.g. "How can I set clearer boundaries?"). Typing in the composer immediately clears the suggestions. |
 | **6. Sanctuary Voice Mode (Speech-to-Text)** | Click the microphone icon in the composer, speak a reflection, and click stop. | Browser SpeechRecognition transcribes your words directly into the reflection textarea in real-time. Any microphone permission errors auto-dismiss or dismiss on click without horizontal overflow. |
-| **7. Sanctuary Audio Narration & 432Hz Drone** | Click the audio play button on any AI reflection response bubble. | Peaceful speech synthesis reads the reflection aloud accompanied by a soothing 432Hz binaural drone with live playback waves. |
+| **7. Sanctuary Audio Narration & 432Hz Synthesizer** | Click the audio play button on any AI reflection response bubble. In Settings &rarr; Voice, click **Listen to 432Hz**. | Peaceful speech synthesis reads the reflection aloud accompanied by an audible multi-harmonic 432Hz sine-wave ambient healing drone with live soundwave animations. |
 | **8. Serenity Time Capsule** | In the composer or header, click **Capsule**, choose 7/30/90/365 days, and seal the active reflection. | The reflection is locked into the Time Capsule Vault. Clicking **Unseal** triggers Gemini 3.6 Flash to analyze personal growth, celebrating emergent strengths. |
 | **9. Echoes of Mind (Resonance Map)** | Click **Echoes** in the top navigation or mobile menu. | Interactive visual canvas renders reflections as emotional nodes (Calm, Clarity, Gratitude, Courage, Growth, Reflective) with connecting resonance links and mood statistics. |
-| **10. Location-Aware Sanctuary Journey** | Click **Sanctuaries** in header or **Tag Location** in composer. Tag GPS coordinates or select a sanctuary preset (e.g. Kyoto Bamboo Grove, Big Sur). | Physical coordinates and sanctuary landmark are pinned on the interactive Google Map and attached to the reflection. |
+| **10. Location-Aware Sanctuary Journey** | Click **Sanctuaries** in header or the amber **Map Pin** in composer. Tag GPS coordinates or select a sanctuary preset (e.g. Kyoto Bamboo Grove, Big Sur). | Physical coordinates and landmark are pinned on the interactive Google Map and attached to the reflection. |
 | **11. Account Settings & Profile Update** | Click the Settings icon in the header next to the avatar. Update display name, pick an avatar, adjust voice sliders, and save. | Profile changes reflect across the dashboard immediately and persist to user profile storage. Email address is permanently locked and uneditable. |
 | **12. Account Deletion & Firestore Data Wipe** | In Settings &rarr; **Delete Account**, type `DELETE` and click **Permanently Delete My Sanctuary**. | All user interactions, time capsules, and profile documents are wiped clean from Cloud Firestore, and the session is signed out safely with a locked screen blocker during processing. |
 | **13. Secret Key Isolation** | Inspect browser network requests to `/api/config` or client source. | The `GEMINI_API_KEY` is completely absent from browser bundles; all generative AI calls proxy securely through server-side `/api/gemini/*` endpoints. |
-| **14. 4 Distinct Calming Voice Profiles** | Open Settings &rarr; Preferences &rarr; Contemplative Voice. Click **Sample** on Maya, David, Claire, and Julian. | Each voice plays a soothing, tranquil mindfulness quote with its authentic accent (American, British, Australian, Canadian) and distinct pitch/rate. Selecting a voice sets it as default for all reflection narrations. |
-| **15. Password-Secured PDF Archive Export** | Open Settings &rarr; Security &rarr; Download PDF Archive. Enter document encryption password, account password, and 2FA code (if enabled), then click **Generate & Encrypt PDF**. | Encrypted PDF downloads locally with 128-bit AES encryption. Opening the PDF prompts the reader for the document password; without it, the document cannot be rendered. Internal security flags are omitted from document headers. |
-| **16. Export Download History & Password Masking** | Open Settings &rarr; Security &rarr; expand **Download History**, or view it in the export dialog. | Displays past download events with timestamp, file name, reflection count, and masked password (`••••••••`). Clicking the eye-mask toggle unmasks the password for copy/retrieval. |
-| **17. 2FA Step-Up Reconfiguration & Removal Guard** | Enable 2FA. Then in Settings &rarr; Security, click **Reconfigure QR Code** or **Disable 2FA**. | A step-up challenge dialog opens prompting for the current 6-digit authenticator code. Entering an invalid code rejects the action. Only entering a valid 6-digit TOTP token permits reconfiguring the QR secret or disabling 2FA. |
-| **18. Public About & Legal Modals from Home Screen** | Sign out. On the landing page, click **About** or **Terms & Privacy** in either the header or the footer. | The About Sanctuary dialog (with FAQs) or the Legal Notice dialog (with Privacy Policy & Terms tabs) opens smoothly for non-logged-in visitors. Modal can be dismissed or navigated without requiring an account. |
-| **19. Theme Selector Stacking & Elevated Dropdown** | On Dashboard or Landing Page, click the palette icon to open theme options. | Dropdown displays above all nearby cards, headings, and input areas without clipping behind any underlying elements. |
+| **14. 5 Natural Indian Origin / Soothing Voice Profiles** | Open Settings &rarr; Voice & Audio. Click **Sample** on Ananya, Tara, Mira, Bodhi, and Varun. | Each voice plays a soothing, tranquil mindfulness quote with its authentic accent and warm, natural human tone. Selecting a voice sets it as default for all reflection narrations. |
+| **15. 4 Reflection Modes Auto-Scaling** | Resize the browser window from wide (desktop/laptop) down to narrow (mobile/tablet). | On wide screens ($\ge 500\text{px}$ container), Brainstorm, Reflection, Summary, and Advice show full text labels. On narrow screens ($< 500\text{px}$), they automatically collapse into icon-only buttons with interactive tooltips without overlapping the title. |
+| **16. Mobile View Switcher** | Open the app on a mobile device or narrow viewport ($< 768\text{px}$). Tap the view switcher at the top. | Smoothly toggles between the active reflection dialogue and past reflection history, maximizing vertical reading space. |
+| **17. Password-Secured PDF Archive Export** | Open Settings &rarr; Security &rarr; Download PDF Archive. Enter document encryption password, account password, and 2FA code (if enabled), then click **Generate & Encrypt PDF**. | Encrypted PDF downloads locally with 128-bit AES encryption. Opening the PDF prompts the reader for the document password; without it, the document cannot be rendered. Internal security flags are omitted from document headers. |
+| **18. Export Download History & Password Masking** | Open Settings &rarr; Security &rarr; expand **Download History**, or view it in the export dialog. | Displays past download events with timestamp, file name, reflection count, and masked password (`••••••••`). Clicking the eye-mask toggle unmasks the password for copy/retrieval. |
+| **19. 2FA Step-Up Reconfiguration & Removal Guard** | Enable 2FA. Then in Settings &rarr; Security, click **Reconfigure QR Code** or **Disable 2FA**. | A step-up challenge dialog opens prompting for the current 6-digit authenticator code. Entering an invalid code rejects the action. Only entering a valid 6-digit TOTP token permits reconfiguring the QR secret or disabling 2FA. |
+| **20. Public About & Legal Modals from Home Screen** | Sign out. On the landing page, click **About** or **Terms & Privacy** in either the header or the footer. | The About Sanctuary dialog (with FAQs) or the Legal Notice dialog (with Privacy Policy & Terms tabs) opens smoothly for non-logged-in visitors. Modal can be dismissed or navigated without requiring an account. |
+| **21. Theme Selector Stacking & Elevated Dropdown** | On Dashboard or Landing Page, click the palette icon to open theme options. | Dropdown displays above all nearby cards, headings, and input areas without clipping behind any underlying elements. |
 
 ---
 

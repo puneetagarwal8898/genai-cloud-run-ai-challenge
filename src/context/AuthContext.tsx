@@ -22,10 +22,12 @@ import {
   twitterProvider,
   linkedInProvider,
   linkedInLegacyProvider,
-  getFirebaseCredentialsStatus
+  getFirebaseCredentialsStatus,
+  db
 } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { AuthProviderType, UserProfile, UserPreferences } from '../types';
-import { wipeAllUserData, archiveAndWipeUserData } from '../services/journalService';
+import { wipeAllUserData, archiveAndWipeUserData, sanitizePayload } from '../services/journalService';
 import { verifyTotpToken } from '../utils/totp';
 
 export interface PendingVerification {
@@ -38,6 +40,11 @@ export interface PendingVerification {
   emailSent?: boolean;
 }
 
+export interface PendingTwoFactorSession {
+  profile: UserProfile;
+  firebaseUser?: User | null;
+}
+
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
@@ -45,7 +52,7 @@ interface AuthContextType {
   isDeletingAccount: boolean;
   error: string | null;
   pendingVerification: PendingVerification | null;
-  pendingTwoFactor: { profile: UserProfile } | null;
+  pendingTwoFactor: PendingTwoFactorSession | null;
   lastUsedProvider: AuthProviderType | null;
   signInWithGoogle: (isTestEnv?: boolean) => Promise<void>;
   signInWithTwitter: (isTestEnv?: boolean) => Promise<void>;
@@ -65,7 +72,7 @@ interface AuthContextType {
   signInAsDemoUser: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUserProfileData: (updates: { displayName?: string; photoURL?: string; preferences?: UserPreferences }) => Promise<void>;
-  deleteUserAccount: (confirmationPassword?: string) => Promise<void>;
+  deleteUserAccount: (confirmationPassword?: string, confirmationTotp?: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -75,6 +82,215 @@ const LOCAL_STORAGE_USER_KEY = 'reflectai_active_user';
 const LOCAL_STORAGE_ACCOUNTS_KEY = 'reflectai_registered_accounts';
 const LOCAL_STORAGE_PENDING_KEY = 'reflectai_pending_verification';
 const LOCAL_STORAGE_LAST_PROVIDER_KEY = 'reflectai_last_login_provider';
+const LOCAL_STORAGE_2FA_REGISTRY_KEY = 'reflectai_2fa_registry';
+const SESSION_STORAGE_2FA_VERIFIED_PREFIX = 'reflectai_2fa_verified_';
+
+interface Stored2FARecord {
+  enabled: boolean;
+  secret: string;
+  configuredAt: string;
+  email?: string;
+  uid?: string;
+}
+
+function getLocal2FARecord(identifier?: string | null): Stored2FARecord | null {
+  if (!identifier) return null;
+  const cleanKey = identifier.trim().toLowerCase();
+  try {
+    // 1. Direct key check
+    const direct = localStorage.getItem(`reflectai_2fa_${cleanKey}`);
+    if (direct) {
+      try {
+        const parsed = JSON.parse(direct);
+        if (parsed && parsed.enabled && parsed.secret) return parsed;
+      } catch {}
+    }
+
+    // 2. Registry table check
+    const raw = localStorage.getItem(LOCAL_STORAGE_2FA_REGISTRY_KEY);
+    if (!raw) return null;
+    const registry: Record<string, Stored2FARecord> = JSON.parse(raw);
+    if (registry[cleanKey]) return registry[cleanKey];
+    if (registry[identifier]) return registry[identifier];
+
+    // 3. Case-insensitive scan
+    const matchKey = Object.keys(registry).find(k => k.trim().toLowerCase() === cleanKey);
+    return matchKey ? registry[matchKey] : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocal2FARecord(record: { email?: string | null; uid?: string | null; secret: string; configuredAt: string; enabled: boolean }) {
+  const cleanEmail = record.email ? record.email.trim().toLowerCase() : undefined;
+  const cleanUid = record.uid ? record.uid.trim() : undefined;
+
+  const item: Stored2FARecord = {
+    enabled: record.enabled,
+    secret: record.secret,
+    configuredAt: record.configuredAt,
+    email: cleanEmail,
+    uid: cleanUid
+  };
+
+  try {
+    // 1. Save to dedicated direct keys for resilient isolation
+    if (cleanEmail) {
+      localStorage.setItem(`reflectai_2fa_${cleanEmail}`, JSON.stringify(item));
+    }
+    if (cleanUid) {
+      localStorage.setItem(`reflectai_2fa_${cleanUid}`, JSON.stringify(item));
+    }
+
+    // 2. Save to 2FA registry table
+    const raw = localStorage.getItem(LOCAL_STORAGE_2FA_REGISTRY_KEY);
+    const registry: Record<string, Stored2FARecord> = raw ? JSON.parse(raw) : {};
+    if (cleanEmail) registry[cleanEmail] = item;
+    if (cleanUid) registry[cleanUid] = item;
+    localStorage.setItem(LOCAL_STORAGE_2FA_REGISTRY_KEY, JSON.stringify(registry));
+  } catch (e) {
+    console.warn('Failed to save to local 2FA storage:', e);
+  }
+
+  // 3. Dispatch to backend server store asynchronously
+  try {
+    fetch('/api/auth/2fa/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        uid: cleanUid,
+        secret: record.secret,
+        configuredAt: record.configuredAt
+      })
+    }).catch(() => {});
+  } catch {}
+}
+
+function removeLocal2FARecord(email?: string | null, uid?: string | null) {
+  const cleanEmail = email ? email.trim().toLowerCase() : undefined;
+  const cleanUid = uid ? uid.trim() : undefined;
+
+  try {
+    if (cleanEmail) localStorage.removeItem(`reflectai_2fa_${cleanEmail}`);
+    if (cleanUid) localStorage.removeItem(`reflectai_2fa_${cleanUid}`);
+
+    const raw = localStorage.getItem(LOCAL_STORAGE_2FA_REGISTRY_KEY);
+    if (raw) {
+      const registry: Record<string, Stored2FARecord> = JSON.parse(raw);
+      if (cleanEmail) delete registry[cleanEmail];
+      if (cleanUid) delete registry[cleanUid];
+      localStorage.setItem(LOCAL_STORAGE_2FA_REGISTRY_KEY, JSON.stringify(registry));
+    }
+  } catch (e) {
+    console.warn('Failed to remove from local 2FA registry:', e);
+  }
+
+  // Remove from server store
+  try {
+    fetch('/api/auth/2fa/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        uid: cleanUid
+      })
+    }).catch(() => {});
+  } catch {}
+}
+
+async function resolve2FAStatus(email?: string | null, uid?: string | null): Promise<{ enabled: boolean; secret?: string; configuredAt?: string }> {
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const cleanUid = uid ? uid.trim() : '';
+
+  // 1. Instant check from local persistent 2FA registry or direct item (survives logout)
+  const localRecord = getLocal2FARecord(cleanEmail) || getLocal2FARecord(cleanUid);
+  if (localRecord && localRecord.enabled && localRecord.secret) {
+    return {
+      enabled: true,
+      secret: localRecord.secret,
+      configuredAt: localRecord.configuredAt
+    };
+  }
+
+  // 2. Check local registered accounts cache
+  try {
+    const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+    if (accountsRaw) {
+      const accounts = JSON.parse(accountsRaw);
+      let acc = (cleanEmail ? accounts[cleanEmail] : null) || (cleanUid ? accounts[cleanUid] : null);
+      if (!acc && cleanEmail) {
+        const foundKey = Object.keys(accounts).find(k => k.trim().toLowerCase() === cleanEmail);
+        if (foundKey) acc = accounts[foundKey];
+      }
+      if (acc?.profile?.twoFactorEnabled && acc?.profile?.twoFactorSecret) {
+        saveLocal2FARecord({
+          email: cleanEmail,
+          uid: cleanUid,
+          secret: acc.profile.twoFactorSecret,
+          configuredAt: acc.profile.twoFactorConfiguredAt || new Date().toISOString(),
+          enabled: true
+        });
+        return {
+          enabled: true,
+          secret: acc.profile.twoFactorSecret,
+          configuredAt: acc.profile.twoFactorConfiguredAt
+        };
+      }
+    }
+  } catch (e) {}
+
+  // 3. Query server-side persistent 2FA endpoint
+  try {
+    const queryParam = cleanEmail ? `identifier=${encodeURIComponent(cleanEmail)}` : (cleanUid ? `uid=${encodeURIComponent(cleanUid)}` : '');
+    if (queryParam) {
+      const res = await fetch(`/api/auth/2fa/status?${queryParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.enabled) {
+          return {
+            enabled: true,
+            configuredAt: data.configuredAt
+          };
+        }
+      }
+    }
+  } catch (netErr) {
+    // Ignore server network errors and proceed to Firestore fallback
+  }
+
+  // 4. Check Firestore users/{uid} document for cloud-persisted 2FA status
+  if (cleanUid) {
+    try {
+      const creds = getFirebaseCredentialsStatus();
+      if (creds.isConfigured) {
+        const userDocRef = doc(db, 'users', cleanUid);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          if (data.twoFactorEnabled && data.twoFactorSecret) {
+            saveLocal2FARecord({
+              email: data.email || cleanEmail,
+              uid: cleanUid,
+              secret: data.twoFactorSecret,
+              configuredAt: data.twoFactorConfiguredAt || new Date().toISOString(),
+              enabled: true
+            });
+            return {
+              enabled: true,
+              secret: data.twoFactorSecret,
+              configuredAt: data.twoFactorConfiguredAt
+            };
+          }
+        }
+      }
+    } catch (fsErr) {
+      console.warn('Failed to query Firestore user profile for 2FA:', fsErr);
+    }
+  }
+
+  return { enabled: false };
+}
 
 // Simple fast SHA-256 equivalent / obfuscation for local credential verification
 function hashPassword(password: string): string {
@@ -119,7 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState<PendingVerification | null>(null);
-  const [pendingTwoFactor, setPendingTwoFactor] = useState<{ profile: UserProfile } | null>(null);
+  const [pendingTwoFactor, setPendingTwoFactor] = useState<PendingTwoFactorSession | null>(null);
   const [lastUsedProvider, setLastUsedProvider] = useState<AuthProviderType | null>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
@@ -133,70 +349,124 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    // 1. Check local session first
-    const storedUser = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-    if (storedUser) {
-      try {
-        const parsed: UserProfile = JSON.parse(storedUser);
-        setUserProfile(parsed);
-        setUser(createMockUser(parsed));
-        setLoading(false);
-        return;
-      } catch (e) {
-        localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-      }
-    }
-
-    // 2. Firebase Auth state observer
     let unsubscribe = () => {};
-    try {
-      const activeAuth = getActiveAuth();
-      unsubscribe = onAuthStateChanged(activeAuth, (currentUser) => {
-        setUser(currentUser);
-        if (currentUser) {
-          const provId = currentUser.providerData?.[0]?.providerId || '';
-          let detectedProvider: AuthProviderType = 'google';
-          if (provId.includes('twitter')) detectedProvider = 'twitter';
-          else if (provId.includes('linkedin')) detectedProvider = 'linkedin';
-          else if (provId.includes('password')) detectedProvider = 'email';
 
-          const profile: UserProfile = {
-            uid: currentUser.uid,
-            email: currentUser.email || `${currentUser.uid}@reflectai.internal`,
-            displayName: currentUser.displayName || 'Reflective Mind',
-            photoURL: currentUser.photoURL || null,
-            authProvider: detectedProvider,
-            emailVerified: currentUser.emailVerified,
-            createdAt: currentUser.metadata.creationTime || new Date().toISOString(),
-            lastActiveAt: new Date().toISOString()
-          };
-          setUserProfile(profile);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_LAST_PROVIDER_KEY, detectedProvider);
-            setLastUsedProvider(detectedProvider);
-          } catch {
-            // safe fallback
+    const initializeAuth = async () => {
+      // 1. Check local session first
+      const storedUser = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+      if (storedUser) {
+        try {
+          const parsed: UserProfile = JSON.parse(storedUser);
+          const twoFa = await resolve2FAStatus(parsed.email, parsed.uid);
+          if (twoFa.enabled && twoFa.secret) {
+            parsed.twoFactorEnabled = true;
+            parsed.twoFactorSecret = twoFa.secret;
+            if (twoFa.configuredAt) parsed.twoFactorConfiguredAt = twoFa.configuredAt;
           }
-        } else {
-          // Only clear if no local user active
-          if (!localStorage.getItem(LOCAL_STORAGE_USER_KEY)) {
-            setUserProfile(null);
+
+          if (parsed.twoFactorEnabled && parsed.twoFactorSecret) {
+            const isSessionVerified =
+              sessionStorage.getItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${parsed.uid}`) === 'true' ||
+              (parsed.email ? sessionStorage.getItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${parsed.email.trim().toLowerCase()}`) === 'true' : false);
+            if (!isSessionVerified) {
+              // 2FA session unverified in this browser tab: hold at gatekeeper
+              setUser(null);
+              setUserProfile(null);
+              setPendingTwoFactor({ profile: parsed, firebaseUser: null });
+              setLoading(false);
+              return;
+            }
           }
+
+          setUserProfile(parsed);
+          setUser(createMockUser(parsed));
+          setLoading(false);
+          return;
+        } catch (e) {
+          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
         }
+      }
+
+      // 2. Firebase Auth state observer
+      try {
+        const activeAuth = getActiveAuth();
+        unsubscribe = onAuthStateChanged(activeAuth, async (currentUser) => {
+          if (currentUser) {
+            const existingStored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+            if (existingStored) {
+              try {
+                const parsed: UserProfile = JSON.parse(existingStored);
+                if (parsed.uid === currentUser.uid) {
+                  const twoFa = await resolve2FAStatus(parsed.email, parsed.uid);
+                  if (twoFa.enabled && twoFa.secret) {
+                    parsed.twoFactorEnabled = true;
+                    parsed.twoFactorSecret = twoFa.secret;
+                    if (twoFa.configuredAt) parsed.twoFactorConfiguredAt = twoFa.configuredAt;
+                  }
+
+                  if (parsed.twoFactorEnabled && parsed.twoFactorSecret) {
+                    const isVerified =
+                      sessionStorage.getItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${parsed.uid}`) === 'true' ||
+                      (parsed.email ? sessionStorage.getItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${parsed.email.trim().toLowerCase()}`) === 'true' : false);
+                    if (!isVerified) {
+                      setUser(null);
+                      setUserProfile(null);
+                      setPendingTwoFactor({ profile: parsed, firebaseUser: currentUser });
+                      setLoading(false);
+                      return;
+                    }
+                  }
+
+                  setUser(currentUser);
+                  setUserProfile(parsed);
+                  setLoading(false);
+                  return;
+                }
+              } catch (e) {}
+            }
+
+            const provId = currentUser.providerData?.[0]?.providerId || '';
+            let detectedProvider: AuthProviderType = 'google';
+            if (provId.includes('twitter')) detectedProvider = 'twitter';
+            else if (provId.includes('linkedin')) detectedProvider = 'linkedin';
+            else if (provId.includes('password')) detectedProvider = 'email';
+
+            const profile: UserProfile = {
+              uid: currentUser.uid,
+              email: currentUser.email || `${currentUser.uid}@reflectai.internal`,
+              displayName: currentUser.displayName || 'Reflective Mind',
+              photoURL: currentUser.photoURL || null,
+              authProvider: detectedProvider,
+              emailVerified: currentUser.emailVerified,
+              createdAt: currentUser.metadata.creationTime || new Date().toISOString(),
+              lastActiveAt: new Date().toISOString()
+            };
+
+            await handleAuthenticationSuccess(profile, currentUser);
+          } else {
+            // Only clear if no local user active
+            if (!localStorage.getItem(LOCAL_STORAGE_USER_KEY)) {
+              setUserProfile(null);
+              setUser(null);
+            }
+          }
+          setLoading(false);
+        }, (err) => {
+          console.warn("Auth state observer warning:", err.message);
+          setLoading(false);
+        });
+      } catch (authErr) {
+        console.warn("Auth state observer initialization warning:", authErr);
         setLoading(false);
-      }, (err) => {
-        console.warn("Auth state observer warning:", err.message);
-        setLoading(false);
-      });
-    } catch (authErr) {
-      console.warn("Auth state observer initialization warning:", authErr);
-      setLoading(false);
-    }
+      }
+    };
+
+    initializeAuth();
 
     // 3. Listen for OAuth popup completion messages (e.g. direct LinkedIn OAuth)
-    const handleOAuthMessage = (event: MessageEvent) => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'LINKEDIN_AUTH_SUCCESS' && event.data?.profile) {
-        saveActiveSession(event.data.profile);
+        await handleAuthenticationSuccess(event.data.profile, null);
         setError(null);
       } else if (event.data?.type === 'LINKEDIN_AUTH_ERROR') {
         setError(event.data.error || 'LinkedIn authentication failed.');
@@ -227,77 +497,184 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(createMockUser(profile));
   };
 
-  const handleAuthenticationSuccess = (profile: UserProfile) => {
-    // Check if 2FA is active on this account
-    let has2FA = Boolean(profile.twoFactorEnabled && profile.twoFactorSecret);
-    let secret = profile.twoFactorSecret;
-
-    if (!has2FA && profile.email) {
-      try {
-        const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
-        if (accountsRaw) {
-          const accounts = JSON.parse(accountsRaw);
-          const emailKey = profile.email.toLowerCase();
-          const acc = accounts[emailKey] || (profile.uid ? accounts[profile.uid] : undefined);
-          if (acc?.profile?.twoFactorEnabled && acc?.profile?.twoFactorSecret) {
-            has2FA = true;
-            secret = acc.profile.twoFactorSecret;
-            profile.twoFactorEnabled = true;
-            profile.twoFactorSecret = secret;
-          }
-        }
-      } catch (e) {}
+  const handleAuthenticationSuccess = async (profile: UserProfile, fbUser?: User | null) => {
+    // 1. Resolve 2FA status thoroughly across all storage layers (Registry, Accounts, Firestore)
+    const twoFa = await resolve2FAStatus(profile.email, profile.uid);
+    if (twoFa.enabled && twoFa.secret) {
+      profile.twoFactorEnabled = true;
+      profile.twoFactorSecret = twoFa.secret;
+      if (twoFa.configuredAt) profile.twoFactorConfiguredAt = twoFa.configuredAt;
     }
 
-    if (has2FA && secret) {
-      setPendingTwoFactor({ profile });
-      return;
+    const has2FA = Boolean(profile.twoFactorEnabled && profile.twoFactorSecret);
+
+    // 2. If 2FA is active, check if current tab session is already verified
+    if (has2FA) {
+      const isSessionVerified =
+        sessionStorage.getItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${profile.uid}`) === 'true' ||
+        (profile.email ? sessionStorage.getItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${profile.email.trim().toLowerCase()}`) === 'true' : false);
+      if (!isSessionVerified) {
+        // Intercept session and prompt 2FA challenge BEFORE exposing user data
+        setUser(null);
+        setUserProfile(null);
+        setPendingTwoFactor({ profile, firebaseUser: fbUser || null });
+        return;
+      }
     }
 
+    // 3. 2FA is either not enabled or verified in this session
     saveActiveSession(profile);
+    if (fbUser) {
+      setUser(fbUser);
+    }
   };
 
   const verifyAndCompleteTwoFactor = async (code: string): Promise<boolean> => {
-    if (!pendingTwoFactor || !pendingTwoFactor.profile.twoFactorSecret) {
+    if (!pendingTwoFactor) {
       throw new Error('No pending two-factor verification session found.');
     }
 
-    const isValid = verifyTotpToken(pendingTwoFactor.profile.twoFactorSecret, code);
+    const cleanCode = code.replace(/\s+/g, '').trim();
+    if (!cleanCode) {
+      return false;
+    }
+
+    let isValid = false;
+
+    if (pendingTwoFactor.profile.twoFactorSecret) {
+      isValid = verifyTotpToken(pendingTwoFactor.profile.twoFactorSecret, cleanCode);
+    } else {
+      // Secure server-side verification without leaking secret to the browser
+      try {
+        const verifyRes = await fetch('/api/auth/2fa/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: pendingTwoFactor.profile.email,
+            uid: pendingTwoFactor.profile.uid,
+            code: cleanCode
+          })
+        });
+        const verifyData = await verifyRes.json();
+        isValid = Boolean(verifyData.verified);
+      } catch {
+        isValid = false;
+      }
+    }
+
     if (!isValid) {
       return false;
     }
 
-    saveActiveSession(pendingTwoFactor.profile);
+    // Mark current tab session as verified for this account
+    try {
+      sessionStorage.setItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${pendingTwoFactor.profile.uid}`, 'true');
+      if (pendingTwoFactor.profile.email) {
+        sessionStorage.setItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${pendingTwoFactor.profile.email.trim().toLowerCase()}`, 'true');
+      }
+    } catch {}
+
+    const verifiedProfile: UserProfile = {
+      ...pendingTwoFactor.profile,
+      twoFactorEnabled: true
+    };
+
+    saveActiveSession(verifiedProfile);
+    if (pendingTwoFactor.firebaseUser) {
+      setUser(pendingTwoFactor.firebaseUser);
+    }
     setPendingTwoFactor(null);
     return true;
   };
 
   const cancelTwoFactor = () => {
     setPendingTwoFactor(null);
+    setUser(null);
+    setUserProfile(null);
+    try {
+      const activeAuth = getActiveAuth();
+      firebaseSignOut(activeAuth).catch(() => {});
+      localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith(SESSION_STORAGE_2FA_VERIFIED_PREFIX)) {
+          sessionStorage.removeItem(k);
+        }
+      }
+    } catch {}
   };
 
   const enableTwoFactorAuth = async (secret: string): Promise<void> => {
     if (!userProfile) throw new Error('No active user session found.');
+    const configuredAt = new Date().toISOString();
     const updated: UserProfile = {
       ...userProfile,
       twoFactorEnabled: true,
       twoFactorSecret: secret,
-      twoFactorConfiguredAt: new Date().toISOString()
+      twoFactorConfiguredAt: configuredAt
     };
+
+    // 1. Mark current browser session verified
+    try {
+      sessionStorage.setItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${userProfile.uid}`, 'true');
+      if (userProfile.email) {
+        sessionStorage.setItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${userProfile.email.trim().toLowerCase()}`, 'true');
+      }
+    } catch {}
+
+    // 2. Update active session & React state
     setUserProfile(updated);
     saveActiveSession(updated);
 
+    // 3. Persist to dedicated persistent 2FA registry (survives logout & localStorage clears of active user)
+    saveLocal2FARecord({
+      email: userProfile.email,
+      uid: userProfile.uid,
+      secret,
+      configuredAt,
+      enabled: true
+    });
+
+    // 4. Update registered accounts record
     try {
       const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
-      if (accountsRaw && userProfile.email) {
-        const accounts = JSON.parse(accountsRaw);
-        const emailKey = userProfile.email.toLowerCase();
+      const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
+      if (userProfile.email) {
+        const emailKey = userProfile.email.toLowerCase().trim();
         if (accounts[emailKey]) {
           accounts[emailKey].profile = updated;
-          localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+        } else {
+          accounts[emailKey] = { profile: updated, passwordHash: '' };
         }
       }
-    } catch (e) {}
+      if (userProfile.uid) {
+        if (accounts[userProfile.uid]) {
+          accounts[userProfile.uid].profile = updated;
+        } else {
+          accounts[userProfile.uid] = { profile: updated, passwordHash: '' };
+        }
+      }
+      localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+    } catch (e) {
+      console.warn("Local accounts sync notice:", e);
+    }
+
+    // 5. Cloud Firestore persistence
+    try {
+      const creds = getFirebaseCredentialsStatus();
+      if (creds.isConfigured && userProfile.uid) {
+        await setDoc(doc(db, 'users', userProfile.uid), sanitizePayload({
+          twoFactorEnabled: true,
+          twoFactorSecret: secret,
+          twoFactorConfiguredAt: configuredAt,
+          email: userProfile.email || null,
+          displayName: userProfile.displayName || null,
+          updatedAt: new Date().toISOString()
+        }), { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn("Firestore 2FA save warning:", fsErr);
+    }
   };
 
   const disableTwoFactorAuth = async (): Promise<void> => {
@@ -308,20 +685,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       twoFactorSecret: undefined,
       twoFactorConfiguredAt: undefined
     };
+
+    // 1. Clear session verified flag
+    try {
+      sessionStorage.removeItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${userProfile.uid}`);
+      if (userProfile.email) {
+        sessionStorage.removeItem(`${SESSION_STORAGE_2FA_VERIFIED_PREFIX}${userProfile.email.trim().toLowerCase()}`);
+      }
+    } catch {}
+
+    // 2. Remove from dedicated persistent 2FA registry
+    removeLocal2FARecord(userProfile.email, userProfile.uid);
+
+    // 3. Update active session & React state
     setUserProfile(updated);
     saveActiveSession(updated);
 
+    // 4. Update registered accounts record
     try {
       const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
-      if (accountsRaw && userProfile.email) {
+      if (accountsRaw) {
         const accounts = JSON.parse(accountsRaw);
-        const emailKey = userProfile.email.toLowerCase();
-        if (accounts[emailKey]) {
-          accounts[emailKey].profile = updated;
-          localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+        if (userProfile.email) {
+          const emailKey = userProfile.email.toLowerCase().trim();
+          if (accounts[emailKey]) {
+            accounts[emailKey].profile = updated;
+          }
         }
+        if (userProfile.uid && accounts[userProfile.uid]) {
+          accounts[userProfile.uid].profile = updated;
+        }
+        localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Local accounts sync notice:", e);
+    }
+
+    // 5. Cloud Firestore persistence
+    try {
+      const creds = getFirebaseCredentialsStatus();
+      if (creds.isConfigured && userProfile.uid) {
+        await setDoc(doc(db, 'users', userProfile.uid), sanitizePayload({
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          twoFactorConfiguredAt: null,
+          updatedAt: new Date().toISOString()
+        }), { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn("Firestore 2FA disable warning:", fsErr);
+    }
   };
 
   const signInWithGoogle = async (isTestEnv = false) => {
@@ -348,7 +761,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
-      handleAuthenticationSuccess(profile);
+      await handleAuthenticationSuccess(profile, loggedUser);
     } catch (err: any) {
       console.error("Google Sign-In error:", err);
       if (isTestEnv) {
@@ -363,7 +776,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        handleAuthenticationSuccess(fallbackProfile);
+        await handleAuthenticationSuccess(fallbackProfile, null);
       } else {
         let msg = err.message || 'Failed to sign in with Google.';
         if (err.code === 'auth/invalid-api-key' || err.code === 'auth/api-key-not-valid' || err.message?.includes('api-key-not-valid')) {
@@ -395,7 +808,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        handleAuthenticationSuccess(fallbackProfile);
+        await handleAuthenticationSuccess(fallbackProfile, null);
         return;
       }
 
@@ -412,7 +825,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
-      handleAuthenticationSuccess(profile);
+      await handleAuthenticationSuccess(profile, loggedUser);
     } catch (err: any) {
       console.warn("Twitter Sign-In notice:", err.code, err.message);
       let msg = err.message || 'Twitter / X sign-in failed.';
@@ -454,7 +867,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        handleAuthenticationSuccess(fallbackProfile);
+        await handleAuthenticationSuccess(fallbackProfile, null);
         return;
       }
 
@@ -494,7 +907,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: loggedUser.metadata.creationTime || new Date().toISOString(),
         lastActiveAt: new Date().toISOString()
       };
-      handleAuthenticationSuccess(profile);
+      await handleAuthenticationSuccess(profile, loggedUser);
     } catch (err: any) {
       console.error("LinkedIn Sign-In Raw Error:", {
         code: err.code,
@@ -882,7 +1295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: fbUser.metadata.creationTime || new Date().toISOString(),
           lastActiveAt: new Date().toISOString()
         };
-        handleAuthenticationSuccess(profile);
+        await handleAuthenticationSuccess(profile, fbUser);
         return;
       } catch (fbErr: any) {
         if (fbErr.code === 'auth/operation-not-allowed') {
@@ -892,7 +1305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
           const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
           if (accounts[trimmedEmail] && accounts[trimmedEmail].passwordHash === hashPassword(password)) {
-            handleAuthenticationSuccess(accounts[trimmedEmail].profile);
+            await handleAuthenticationSuccess(accounts[trimmedEmail].profile, null);
             return;
           }
           throw new Error("This account doesn't exist. Please create an account to get started.");
@@ -903,7 +1316,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
           const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
           if (accounts[trimmedEmail] && accounts[trimmedEmail].passwordHash === hashPassword(password)) {
-            handleAuthenticationSuccess(accounts[trimmedEmail].profile);
+            await handleAuthenticationSuccess(accounts[trimmedEmail].profile, null);
             return;
           }
           throw new Error("This account doesn't exist. Please create an account to get started.");
@@ -924,7 +1337,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Incorrect password. Please try again.');
     }
 
-    handleAuthenticationSuccess(account.profile);
+    await handleAuthenticationSuccess(account.profile, null);
   };
 
   const resetPassword = async (email: string) => {
@@ -1014,7 +1427,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastActiveAt: new Date().toISOString()
       };
 
-      handleAuthenticationSuccess(mockProfile);
+      await handleAuthenticationSuccess(mockProfile, null);
     } catch (err: any) {
       setError(err.message || 'Demo test sign in failed.');
     }
@@ -1023,8 +1436,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setError(null);
     try {
+      try {
+        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+          const k = sessionStorage.key(i);
+          if (k && k.startsWith(SESSION_STORAGE_2FA_VERIFIED_PREFIX)) {
+            sessionStorage.removeItem(k);
+          }
+        }
+      } catch {}
+      setPendingTwoFactor(null);
       localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-      await firebaseSignOut(auth).catch(() => {});
+      try {
+        const activeAuth = getActiveAuth();
+        await firebaseSignOut(activeAuth).catch(() => {});
+      } catch {}
       setUser(null);
       setUserProfile(null);
     } catch (err: any) {
@@ -1080,7 +1505,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const deleteUserAccount = async (confirmationPassword?: string): Promise<void> => {
+  const deleteUserAccount = async (confirmationPassword?: string, confirmationTotp?: string): Promise<void> => {
     setError(null);
     const targetUid = userProfile?.uid || user?.uid;
     const targetEmail = (userProfile?.email || user?.email || '').trim().toLowerCase();
@@ -1088,8 +1513,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error("No active user session found to delete.");
     }
 
-    // 0. Strict Pre-Validation: Validate password BEFORE performing any data erasure or UI lockdown
-    if (userProfile?.authProvider === 'email') {
+    // 0. Strict Pre-Validation: Validate 2FA or Password BEFORE performing any data erasure or UI lockdown
+    const has2FA = Boolean(userProfile?.twoFactorEnabled);
+    if (has2FA) {
+      const cleanTotp = (confirmationTotp || '').replace(/\s+/g, '').trim();
+      if (!cleanTotp) {
+        throw new Error("Please enter your 6-digit authenticator 2FA code to confirm account deletion.");
+      }
+      if (cleanTotp.length !== 6) {
+        throw new Error("Authenticator code must be exactly 6 digits.");
+      }
+
+      let isValid = false;
+      if (userProfile?.twoFactorSecret) {
+        isValid = verifyTotpToken(userProfile.twoFactorSecret, cleanTotp);
+      } else {
+        // Secure server-side verification without leaking secret to client
+        try {
+          const res = await fetch('/api/auth/2fa/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: targetEmail,
+              uid: targetUid,
+              code: cleanTotp
+            })
+          });
+          const data = await res.json();
+          isValid = Boolean(data.verified);
+        } catch {
+          isValid = false;
+        }
+      }
+
+      if (!isValid) {
+        throw new Error("Invalid 2FA authenticator code. Please check your authenticator app and try again.");
+      }
+    } else if (userProfile?.authProvider === 'email') {
       const cleanPassword = (confirmationPassword || '').trim();
       if (!cleanPassword) {
         throw new Error("Please enter your account password to confirm account deletion.");
@@ -1185,6 +1645,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // 3. Purge session tokens from localStorage and sessionStorage
         try {
+          removeLocal2FARecord(targetEmail, targetUid);
           localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
           localStorage.removeItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
           localStorage.removeItem(LOCAL_STORAGE_PENDING_KEY);

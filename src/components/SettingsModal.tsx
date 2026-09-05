@@ -31,6 +31,7 @@ import {
   play432HzPreview,
   stop432HzPreview,
   is432HzPreviewPlaying,
+  normalizeVoiceId,
   VoiceProfile
 } from '../utils/voiceUtils';
 import { verifyTotpToken } from '../utils/totp';
@@ -94,8 +95,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [voicePitch, setVoicePitch] = useState(userProfile?.preferences?.voicePitch || 1.0);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(() => {
     const rawId = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
-    if (rawId === 'female-aria' || rawId === 'aria') return 'female-celeste';
-    return rawId || CURATED_VOICES[0].id;
+    return normalizeVoiceId(rawId);
   });
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const debounceSliderTimerRef = useRef<any>(null);
@@ -116,6 +116,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
+  const [deleteTotpCode, setDeleteTotpCode] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -131,7 +132,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setSelectedAvatar(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
       setCustomAvatarUrl('');
       const rawVoice = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
-      setSelectedVoiceId(rawVoice === 'female-aria' || rawVoice === 'aria' ? 'female-celeste' : (rawVoice || CURATED_VOICES[0].id));
+      setSelectedVoiceId(normalizeVoiceId(rawVoice));
       setPreviewingVoiceId(null);
       setIsPlaying432Hz(false);
       setTwoFactorNotice(null);
@@ -140,6 +141,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setShowDeleteConfirm(false);
       setDeleteInput('');
       setDeletePassword('');
+      setDeleteTotpCode('');
       setDeleteError(null);
     }
   }, [isOpen, defaultTab, userProfile, user]);
@@ -165,10 +167,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     };
   }, [isOpen, onClose, isDeleting]);
 
-  // Stop sound previews when switching tabs
+  // Stop sound previews when switching tabs or closing modal
+  React.useEffect(() => {
+    if (!isOpen) {
+      stopVoicePreview();
+      stop432HzPreview(true);
+      setPreviewingVoiceId(null);
+      setIsPlaying432Hz(false);
+    }
+  }, [isOpen]);
+
   React.useEffect(() => {
     stopVoicePreview();
-    stop432HzPreview();
+    stop432HzPreview(true);
     setPreviewingVoiceId(null);
     setIsPlaying432Hz(false);
   }, [activeTab]);
@@ -177,7 +188,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleToggle432HzPreview = () => {
     if (isPlaying432Hz) {
-      stop432HzPreview();
+      stop432HzPreview(false);
       setIsPlaying432Hz(false);
     } else {
       stopVoicePreview();
@@ -223,7 +234,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (previewingVoiceId) {
       if (debounceSliderTimerRef.current) clearTimeout(debounceSliderTimerRef.current);
       debounceSliderTimerRef.current = setTimeout(() => {
-        const activeVoice = CURATED_VOICES.find(v => v.id === previewingVoiceId) || CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+        const normalized = normalizeVoiceId(previewingVoiceId || selectedVoiceId);
+        const activeVoice = CURATED_VOICES.find(v => v.id === normalized) || CURATED_VOICES[0];
         handlePreviewVoice(activeVoice, newRate, voicePitch);
       }, 160);
     }
@@ -234,14 +246,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (previewingVoiceId) {
       if (debounceSliderTimerRef.current) clearTimeout(debounceSliderTimerRef.current);
       debounceSliderTimerRef.current = setTimeout(() => {
-        const activeVoice = CURATED_VOICES.find(v => v.id === previewingVoiceId) || CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+        const normalized = normalizeVoiceId(previewingVoiceId || selectedVoiceId);
+        const activeVoice = CURATED_VOICES.find(v => v.id === normalized) || CURATED_VOICES[0];
         handlePreviewVoice(activeVoice, voiceRate, newPitch);
       }, 160);
     }
   };
 
   const handleAuditionSelectedVoice = () => {
-    const selectedProfile = CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+    const normalized = normalizeVoiceId(selectedVoiceId);
+    const selectedProfile = CURATED_VOICES.find(v => v.id === normalized) || CURATED_VOICES[0];
     handlePreviewVoice(selectedProfile, voiceRate, voicePitch);
   };
 
@@ -252,7 +266,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setSaveError(null);
 
     try {
-      const matchedVoice = CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+      const normalized = normalizeVoiceId(selectedVoiceId);
+      const matchedVoice = CURATED_VOICES.find(v => v.id === normalized) || CURATED_VOICES[0];
       await updateUserProfileData({
         displayName: displayName.trim() || 'Mindful Soul',
         photoURL: customAvatarUrl.trim() || selectedAvatar,
@@ -262,11 +277,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           voiceRate,
           voiceSpeed: voiceRate,
           voicePitch: voicePitch,
-          selectedVoiceId,
+          selectedVoiceId: matchedVoice.id,
           selectedVoiceURI: matchedVoice.keywords[0],
           selectedVoiceGender: matchedVoice.gender
         }
       });
+      localStorage.setItem('reflectai_selected_voice_id', matchedVoice.id);
+      localStorage.setItem('reflectai_selected_voice_uri', matchedVoice.keywords[0]);
       setIsSaving(false);
       onClose();
     } catch (err: any) {
@@ -281,7 +298,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setSaveError(null);
 
     try {
-      const matchedVoice = CURATED_VOICES.find(v => v.id === selectedVoiceId) || CURATED_VOICES[0];
+      const normalized = normalizeVoiceId(selectedVoiceId);
+      const matchedVoice = CURATED_VOICES.find(v => v.id === normalized) || CURATED_VOICES[0];
       await updateUserProfileData({
         preferences: {
           ambientSound,
@@ -289,12 +307,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           voiceRate,
           voiceSpeed: voiceRate,
           voicePitch: voicePitch,
-          selectedVoiceId,
+          selectedVoiceId: matchedVoice.id,
           selectedVoiceURI: matchedVoice.keywords[0],
           selectedVoiceGender: matchedVoice.gender
         }
       });
-      localStorage.setItem('reflectai_selected_voice_id', selectedVoiceId);
+      localStorage.setItem('reflectai_selected_voice_id', matchedVoice.id);
       localStorage.setItem('reflectai_selected_voice_uri', matchedVoice.keywords[0]);
       setIsSaving(false);
       onClose();
@@ -305,7 +323,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleInitiate2FAAction = (action: 'reconfigure' | 'disable') => {
-    if (userProfile?.twoFactorEnabled && userProfile?.twoFactorSecret) {
+    if (userProfile?.twoFactorEnabled) {
       setTwoFactorChallengeAction(action);
       setChallengeTotpCode('');
       setChallengeError(null);
@@ -325,11 +343,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setChallengeError('Please enter the 6-digit code from your authenticator app.');
       return;
     }
-    if (!userProfile?.twoFactorSecret) {
-      setChallengeError('No 2FA secret found on this account.');
-      return;
+
+    let isValid = false;
+    if (userProfile?.twoFactorSecret) {
+      isValid = verifyTotpToken(userProfile.twoFactorSecret, cleanCode);
+    } else {
+      try {
+        const res = await fetch('/api/auth/2fa/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userProfile?.email,
+            uid: userProfile?.uid,
+            code: cleanCode
+          })
+        });
+        const data = await res.json();
+        isValid = Boolean(data.verified);
+      } catch {
+        isValid = false;
+      }
     }
-    const isValid = verifyTotpToken(userProfile.twoFactorSecret, cleanCode);
+
     if (!isValid) {
       setChallengeError('Invalid 2FA authenticator code. Please check your authenticator app and try again.');
       return;
@@ -377,7 +412,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    if (userProfile?.authProvider === 'email' && !deletePassword.trim()) {
+    const has2FA = Boolean(userProfile?.twoFactorEnabled);
+    const isEmailAuth = userProfile?.authProvider === 'email';
+
+    if (has2FA) {
+      const cleanTotp = deleteTotpCode.replace(/\s+/g, '').trim();
+      if (!cleanTotp) {
+        setDeleteError("Please enter the 6-digit code from your authenticator app.");
+        return;
+      }
+      if (cleanTotp.length !== 6) {
+        setDeleteError("Authenticator code must be exactly 6 digits.");
+        return;
+      }
+      if (userProfile?.twoFactorSecret) {
+        const isValid = verifyTotpToken(userProfile.twoFactorSecret, cleanTotp);
+        if (!isValid) {
+          setDeleteError("Invalid 2FA authenticator code. Please check your authenticator app and try again.");
+          return;
+        }
+      }
+    } else if (isEmailAuth && !deletePassword.trim()) {
       setDeleteError("Please enter your account password to confirm account deletion.");
       return;
     }
@@ -385,7 +440,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsDeleting(true);
 
     try {
-      await deleteUserAccount(deletePassword.trim() || undefined);
+      await deleteUserAccount(
+        isEmailAuth && !has2FA ? deletePassword.trim() : undefined,
+        has2FA ? deleteTotpCode.trim() : undefined
+      );
       onClose();
     } catch (err: any) {
       setDeleteError(err.message || 'Failed to complete account deletion.');
@@ -793,12 +851,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {isPlaying432Hz ? (
                       <>
+                        <div className="flex items-center gap-0.5 mr-0.5">
+                          <span className="w-1 h-3 bg-amber-500 rounded-full animate-pulse" />
+                          <span className="w-1 h-4 bg-amber-500 rounded-full animate-pulse delay-75" />
+                          <span className="w-1 h-2 bg-amber-500 rounded-full animate-pulse delay-150" />
+                        </div>
                         <Square className="w-3 h-3 fill-current" />
                         <span className="text-xs font-semibold">Stop 432Hz Drone</span>
                       </>
                     ) : (
                       <>
-                        <Radio className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                        <Radio className="w-3.5 h-3.5 text-amber-500" />
                         <span className="text-xs font-medium">Listen to 432Hz Preview</span>
                       </>
                     )}
@@ -961,6 +1024,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 {voice.accent}
                               </span>
                             </div>
+                            <p className="text-[10px] font-medium mt-0.5 opacity-90" style={{ color: 'var(--text-muted)' }}>
+                              {voice.meaning}
+                            </p>
                             <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--accent)' }}>
                               {voice.tone}
                             </p>
@@ -1397,9 +1463,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       placeholder="Type DELETE"
                       className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    {userProfile?.authProvider === 'email' && (
+                    {/* If 2FA is active, require 2FA Authenticator Code */}
+                    {Boolean(userProfile?.twoFactorEnabled) ? (
                       <div className="space-y-1">
-                        <label className="text-[11px] font-medium text-rose-700 dark:text-rose-300">
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="confirm-delete-totp-input"
+                            className="text-[11px] font-medium text-rose-700 dark:text-rose-300 flex items-center gap-1.5"
+                          >
+                            <Shield className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            Two-Factor Authenticator Code (required):
+                          </label>
+                          <span className="text-[10px] text-rose-500 font-medium">6 digits</span>
+                        </div>
+                        <input
+                          id="confirm-delete-totp-input"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          disabled={isDeleting}
+                          value={deleteTotpCode}
+                          onChange={(e) => {
+                            setDeleteTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                            if (deleteError) setDeleteError(null);
+                          }}
+                          placeholder="000000"
+                          className="w-full px-3 py-2 text-xs font-mono tracking-widest text-center rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed placeholder:font-normal placeholder:tracking-normal"
+                        />
+                      </div>
+                    ) : userProfile?.authProvider === 'email' ? (
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="confirm-delete-password-input"
+                          className="text-[11px] font-medium text-rose-700 dark:text-rose-300 flex items-center gap-1.5"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                           Account password (required to verify identity):
                         </label>
                         <input
@@ -1416,7 +1515,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
-                    )}
+                    ) : null}
                     {deleteError && (
                       <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150">
                         <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
@@ -1434,6 +1533,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           setShowDeleteConfirm(false);
                           setDeleteInput('');
                           setDeletePassword('');
+                          setDeleteTotpCode('');
                           setDeleteError(null);
                         }}
                         className="px-3 py-1.5 text-xs opacity-70 hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"

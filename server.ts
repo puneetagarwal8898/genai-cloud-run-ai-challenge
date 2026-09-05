@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
+import * as OTPAuth from "otpauth";
 import { createServer as createViteServer } from "vite";
 import { generateContentWithFallback } from "./server/gemini.ts";
 
@@ -85,7 +86,8 @@ app.get("/api/config", (req, res) => {
 
 // Dynamic client-side Google Maps key bootstrap script
 app.get("/api/maps-config.js", (req, res) => {
-  const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.MAPS_API_KEY || process.env.VITE_MAPS_API_KEY || "";
+  // Never leak backend or unrestricted server-side Google Cloud keys to the browser; only use client-scoped variables
+  const mapsApiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.VITE_MAPS_API_KEY || "";
   res.setHeader("Content-Type", "application/javascript");
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.send(`window.__GOOGLE_MAPS_API_KEY__ = ${JSON.stringify(mapsApiKey)};`);
@@ -144,7 +146,7 @@ const placeAutocompleteCache = new Map<string, { timestamp: number; data: any[] 
 // Real-time location autocomplete endpoint providing accurate coordinates
 app.get("/api/places/autocomplete", async (req, res) => {
   try {
-    const rawQuery = typeof req.query.q === "string" ? req.query.q : "";
+    const rawQuery = typeof req.query.q === "string" ? req.query.q : typeof req.query.input === "string" ? req.query.input : "";
     const query = rawQuery.trim().toLowerCase();
 
     if (!query || query.length < 2) {
@@ -256,7 +258,8 @@ app.get("/api/places/autocomplete", async (req, res) => {
 // Dynamic client-side Firebase bootstrap script
 // Provides seamless runtime resolution in both development (Vite) and Cloud Run production
 app.get("/api/firebase-config.js", (req, res) => {
-  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || "";
+  // Only expose client-safe web API keys; never leak backend service accounts or private keys
+  const firebaseApiKey = process.env.VITE_FIREBASE_API_KEY || (process.env.FIREBASE_API_KEY?.startsWith("AIza") ? process.env.FIREBASE_API_KEY : "");
   const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "";
   const clientConfig = {
     apiKey: firebaseApiKey,
@@ -329,15 +332,14 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
         return;
       } catch (mailError: any) {
         console.error("Nodemailer dispatch failed:", mailError);
-        // If in test mode, fall back to sandbox inspection so user is never stranded
+        // If in test mode, log code to server console only; NEVER send the code across HTTP response
         if (isTestMode) {
+          console.log(`[DEV/TEST Sandbox Auth] Single-use verification code for ${email}: ${code}`);
           res.json({
             success: true,
             emailSent: false,
             fallbackToSandbox: true,
-            previewCode: code,
-            error: mailError.message,
-            message: `SMTP dispatch error (${mailError.message}). Sandbox fallback code generated for testing.`
+            message: `SMTP dispatch error (${mailError.message}). In test sandbox mode, verification code is recorded in server logs.`
           });
           return;
         }
@@ -355,13 +357,13 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
         return;
       }
 
-      // In Sandbox / Test environment
+      // In Sandbox / Test environment: record to secure server console only; NEVER in client HTTP response
+      console.log(`[DEV/TEST Sandbox Auth] Single-use verification code for ${email}: ${code}`);
       res.json({
         success: true,
         emailSent: false,
         requiresSmtpConfig: true,
-        previewCode: code,
-        message: "Email dispatch service is waiting for SMTP configuration. In Test Sandbox mode, verification code is provided in your developer console."
+        message: "Email dispatch service is waiting for SMTP configuration. In Test Sandbox mode, verification code is recorded in your server console."
       });
     }
   } catch (err: any) {
@@ -418,6 +420,170 @@ app.post("/api/auth/verify-code", (req, res) => {
   } catch (err: any) {
     console.error("verify-code error:", err);
     res.status(500).json({ error: "Internal verification failure." });
+  }
+});
+
+// Persistent 2FA Registry Store for Multi-Layered Authentication Reliability
+interface Server2FARecord {
+  enabled: boolean;
+  secret: string;
+  configuredAt: string;
+  email?: string;
+  uid?: string;
+}
+
+const server2FAStore = new Map<string, Server2FARecord>();
+
+// Disk-backed persistence helper for 2FA store
+const TWO_FA_STORAGE_FILE = path.join(process.cwd(), ".data_2fa.json");
+try {
+  if (fs.existsSync(TWO_FA_STORAGE_FILE)) {
+    const raw = fs.readFileSync(TWO_FA_STORAGE_FILE, "utf-8");
+    const data = JSON.parse(raw);
+    if (typeof data === "object" && data !== null) {
+      for (const [k, v] of Object.entries(data)) {
+        server2FAStore.set(k, v as Server2FARecord);
+      }
+    }
+  }
+} catch (e) {
+  console.warn("Failed to load initial 2FA storage file:", e);
+}
+
+function persist2FAStore() {
+  try {
+    const obj: Record<string, Server2FARecord> = {};
+    for (const [k, v] of server2FAStore.entries()) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(TWO_FA_STORAGE_FILE, JSON.stringify(obj), "utf-8");
+  } catch (e) {
+    console.warn("Failed to persist 2FA storage file:", e);
+  }
+}
+
+// 2FA status query endpoint - strictly sanitized; NEVER exposes secret seeds to unauthenticated callers
+app.get("/api/auth/2fa/status", (req, res) => {
+  try {
+    const identifier = typeof req.query.identifier === "string" ? req.query.identifier.trim().toLowerCase() : "";
+    const uid = typeof req.query.uid === "string" ? req.query.uid.trim() : "";
+
+    let match: Server2FARecord | undefined;
+    if (identifier && server2FAStore.has(identifier)) {
+      match = server2FAStore.get(identifier);
+    } else if (uid && server2FAStore.has(uid)) {
+      match = server2FAStore.get(uid);
+    }
+
+    if (match && match.enabled && match.secret) {
+      res.json({
+        enabled: true,
+        configuredAt: match.configuredAt
+      });
+      return;
+    }
+
+    res.json({ enabled: false });
+  } catch (err: any) {
+    res.json({ enabled: false });
+  }
+});
+
+// Secure server-side 2FA verification endpoint (Verifies 6-digit TOTP against stored secret without exposing secret to client)
+app.post("/api/auth/2fa/verify", (req, res) => {
+  try {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const uid = typeof body.uid === "string" ? body.uid.trim() : "";
+    const code = typeof body.code === "string" ? body.code.replace(/\s+/g, "").trim() : "";
+
+    if (!code || (!email && !uid)) {
+      res.status(400).json({ verified: false, error: "Code and at least one user identifier are required." });
+      return;
+    }
+
+    let match: Server2FARecord | undefined;
+    if (email && server2FAStore.has(email)) {
+      match = server2FAStore.get(email);
+    } else if (uid && server2FAStore.has(uid)) {
+      match = server2FAStore.get(uid);
+    }
+
+    if (!match || !match.enabled || !match.secret) {
+      res.status(404).json({ verified: false, error: "No active 2FA configuration found." });
+      return;
+    }
+
+    const totp = new OTPAuth.TOTP({
+      issuer: "ReflectAI",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(match.secret)
+    });
+
+    const delta = totp.validate({ token: code, window: 1 });
+    const isValid = delta !== null;
+
+    if (isValid) {
+      res.json({ verified: true });
+    } else {
+      res.status(401).json({ verified: false, error: "Invalid 2FA authenticator code." });
+    }
+  } catch (err: any) {
+    console.error("2FA server verification error:", err);
+    res.status(500).json({ verified: false, error: "Failed to verify 2FA code." });
+  }
+});
+
+// 2FA save endpoint
+app.post("/api/auth/2fa/save", (req, res) => {
+  try {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const uid = typeof body.uid === "string" ? body.uid.trim() : "";
+    const secret = typeof body.secret === "string" ? body.secret.trim() : "";
+    const configuredAt = typeof body.configuredAt === "string" ? body.configuredAt : new Date().toISOString();
+
+    if (!secret || (!email && !uid)) {
+      res.status(400).json({ error: "Secret and at least one identifier (email or uid) are required." });
+      return;
+    }
+
+    const record: Server2FARecord = {
+      enabled: true,
+      secret,
+      configuredAt,
+      email: email || undefined,
+      uid: uid || undefined
+    };
+
+    if (email) server2FAStore.set(email, record);
+    if (uid) server2FAStore.set(uid, record);
+    persist2FAStore();
+
+    res.json({ success: true, message: "2FA configuration saved." });
+  } catch (err: any) {
+    console.error("2FA save error:", err);
+    res.status(500).json({ error: "Failed to persist 2FA configuration." });
+  }
+});
+
+// 2FA remove endpoint
+app.post("/api/auth/2fa/remove", (req, res) => {
+  try {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const uid = typeof body.uid === "string" ? body.uid.trim() : "";
+
+    if (email) server2FAStore.delete(email);
+    if (uid) server2FAStore.delete(uid);
+    persist2FAStore();
+
+    res.json({ success: true, message: "2FA configuration removed." });
+  } catch (err: any) {
+    console.error("2FA remove error:", err);
+    res.status(500).json({ error: "Failed to remove 2FA configuration." });
   }
 });
 
@@ -692,13 +858,13 @@ app.post("/api/gemini/converse", async (req, res) => {
       parts: [{ text: prompt }]
     });
 
-    // Enhance system instruction to mandate structured JSON with response, summary, 3 suggestions, and mood
+    // Enhance system instruction to mandate structured JSON with response, summary, 3 resonant suggestions, and mood
     systemInstruction += `
 
 You MUST respond in valid JSON format with four fields:
 1. "response": (string) Your complete, thoughtful, and compassionate reflection response to the user's latest thought.
 2. "summary": (string) A crisp 1-sentence synopsis under 18 words.
-3. "suggestedPrompts": (array of 3 strings) Exactly 3 short, intriguing follow-up questions or reflection prompts (under 55 characters each) that the user can click next to continue this dialogue.
+3. "suggestedPrompts": (array of 3 strings) Exactly 3 deeply resonant, highly engaging follow-up questions or reflection prompts written in the natural, first-person voice of what the user would genuinely want to explore next (such as "How can I untangle the fear behind this?", "What would happen if I took the smallest step today?", "Can you help me reframe this thought with compassion?", "Where is this resistance really coming from?", "What's an unconventional angle I haven't considered?"). Ground each prompt directly in the specific thoughts, decisions, or emotions the user expressed in this conversation (never generic or clipped questions). Each prompt must be 6 to 14 words, conversational, empathetic, and intellectually curious to deepen understanding and self-discovery.
 4. "mood": (string) Exactly one of: "calm", "clarity", "gratitude", "courage", "growth", "anxious", "reflective" that best captures the emotional undertone.
 Return ONLY pure JSON.`;
 
@@ -750,27 +916,27 @@ Return ONLY pure JSON.`;
     if (!suggestedPrompts || suggestedPrompts.length === 0) {
       if (mode === "brainstorm") {
         suggestedPrompts = [
-          "Which of these ideas has the lowest friction to test?",
-          "How can we turn this into a 3-step action plan?",
-          "What is an unconventional alternative to this?"
+          "Can you help me map out the very first frictionless step?",
+          "What is an unconventional, creative angle we haven't considered?",
+          "If I had zero fear of failing, how would I approach this?"
         ];
       } else if (mode === "summary") {
         suggestedPrompts = [
-          "What is the single most important takeaway here?",
-          "How does this connect to my long-term goals?",
-          "What mindset shift will help implement this?"
+          "What is the core emotional truth underneath all of this?",
+          "How can I turn these realizations into daily habits?",
+          "What old story or mindset do I need to let go of?"
         ];
       } else if (mode === "advice") {
         suggestedPrompts = [
-          "What potential obstacles should I prepare for?",
-          "Can you break down step one in more detail?",
-          "How can I maintain accountability with this?"
+          "Can you walk me through the hardest part of putting this into practice?",
+          "How do I handle feelings of doubt or resistance when they arise?",
+          "What does self-compassion look like for me right now in this situation?"
         ];
       } else {
         suggestedPrompts = [
-          "What underlying feeling is driving this thought?",
-          "How might I view this situation with more self-compassion?",
-          "What would success look like one month from today?"
+          "Can we explore what underlying need or fear is surfacing here?",
+          "How can I look at this experience with more gentleness and curiosity?",
+          "What would my wisest, most grounded future self tell me today?"
         ];
       }
     }
@@ -785,19 +951,19 @@ Return ONLY pure JSON.`;
   } catch (error: any) {
     console.error("Gemini API handler error:", error);
     res.status(500).json({
-      error: error?.message || "Failed to generate AI response. Please verify Gemini API key configuration."
+      error: "Failed to generate reflection response. Please try again in a moment."
     });
   }
 });
 
-// Time Capsule Growth Synthesis Endpoint
-app.post("/api/gemini/synthesize-growth", async (req, res) => {
+// Time Capsule Growth Synthesis Endpoint (Supports both route aliases)
+app.post(["/api/gemini/synthesize-growth", "/api/reflect/synthesize-growth"], async (req, res) => {
   try {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
-    const pastPrompt = typeof body.pastPrompt === "string" ? body.pastPrompt.trim() : "";
-    const pastResponse = typeof body.pastResponse === "string" ? body.pastResponse.trim() : "";
-    const sealedDate = typeof body.sealedDate === "string" ? body.sealedDate : "the past";
-    const currentContext = typeof body.currentContext === "string" ? body.currentContext.trim() : "";
+    const pastPrompt = (typeof body.pastPrompt === "string" ? body.pastPrompt : typeof body.originalPrompt === "string" ? body.originalPrompt : "").trim();
+    const pastResponse = (typeof body.pastResponse === "string" ? body.pastResponse : typeof body.originalReflection === "string" ? body.originalReflection : "").trim();
+    const sealedDate = typeof body.sealedDate === "string" ? body.sealedDate : typeof body.sealDate === "string" ? body.sealDate : "the past";
+    const currentContext = (typeof body.currentContext === "string" ? body.currentContext : typeof body.currentPerspectiveNote === "string" ? body.currentPerspectiveNote : "").trim();
 
     if (!pastPrompt) {
       res.status(400).json({ error: "Time capsule reflection content is required." });
@@ -867,7 +1033,7 @@ CURRENT PERSPECTIVE / UPDATES FROM USER:
     });
   } catch (err: any) {
     console.error("Growth synthesis error:", err);
-    res.status(500).json({ error: err.message || "Failed to synthesize growth." });
+    res.status(500).json({ error: "Failed to synthesize temporal growth analysis. Please try again in a moment." });
   }
 });
 
@@ -950,7 +1116,7 @@ async function startServer() {
     app.use(express.static(distPath, { index: false }));
     app.get("*", (req, res) => {
       const indexPath = path.join(distPath, "index.html");
-      const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || "";
+      const firebaseApiKey = process.env.VITE_FIREBASE_API_KEY || (process.env.FIREBASE_API_KEY?.startsWith("AIza") ? process.env.FIREBASE_API_KEY : "");
       const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "";
       const currentEnv = process.env.APP_ENV || "test";
       const isProd = currentEnv === "production";

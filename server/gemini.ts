@@ -2,8 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 
 // Standard Resilient Fallback Ladder ordered by latency and model availability
 export const MODEL_FALLBACK_LADDER = [
-  "gemini-3.8-flash",
   "gemini-3.6-flash",
+  "gemini-3.8-flash",
   "gemini-3.1-flash-lite",
   "gemini-flash-latest",
   "gemini-3.7-flash"

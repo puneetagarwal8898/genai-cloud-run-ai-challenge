@@ -111,14 +111,18 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
     setUnsealError(null);
 
     try {
-      const res = await fetch('/api/reflect/synthesize-growth', {
+      const res = await fetch('/api/gemini/synthesize-growth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          pastPrompt: capsule.prompt,
           originalPrompt: capsule.prompt,
+          pastResponse: capsule.geminiResponse || '',
           originalReflection: capsule.geminiResponse || '',
+          sealedDate: capsule.timeCapsule?.sealDate || capsule.createdAt,
           sealDate: capsule.timeCapsule?.sealDate || capsule.createdAt,
           unsealDate: new Date().toISOString(),
+          currentContext: unsealReflectionNote.trim(),
           currentPerspectiveNote: unsealReflectionNote.trim()
         })
       });

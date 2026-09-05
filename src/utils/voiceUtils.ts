@@ -1,11 +1,13 @@
 export interface VoiceProfile {
   id: string;
   name: string;
+  meaning: string;
   gender: 'female' | 'male';
   tone: string;
   accent: string;
   description: string;
   keywords: string[];
+  preferredLocale?: 'en-GB' | 'en-US' | 'en-IN' | 'any';
   defaultRate: number;
   defaultPitch: number;
   sampleText: string;
@@ -13,58 +15,73 @@ export interface VoiceProfile {
 
 export const CURATED_VOICES: VoiceProfile[] = [
   {
-    id: 'female-celeste',
-    name: 'Celeste',
+    id: 'voice-ananya',
+    name: 'Ananya',
+    meaning: 'Sanskrit: "Unique & Serene Presence"',
     gender: 'female',
     tone: 'Soft, Warm & Tranquil',
-    accent: 'Natural Cadence / Mindful & Velvety',
-    description: 'A beautifully natural, velvety female voice with an unhurried, restorative presence designed for deep calm, gentle clarity, and total peaceful relaxation.',
+    accent: 'Natural English / Melodic & Serene',
+    description: 'A beautifully natural, velvety female voice with an unhurried, restorative presence designed for deep calm, gentle clarity, and peaceful relaxation.',
     keywords: [
       'natural',
       'neural',
+      'neerja',
       'ava',
       'jenny',
       'samantha',
       'allison',
       'libby',
+      'sonia',
       'moira',
       'claire',
-      'google us english'
+      'google us english female',
+      'google us english',
+      'siri'
     ],
-    defaultRate: 0.88,
+    preferredLocale: 'any',
+    defaultRate: 0.92,
     defaultPitch: 1.0,
     sampleText: 'Breathe in gentle stillness, and let every tension melt away. You are safe, relaxed, and fully present in this quiet sanctuary.'
   },
   {
-    id: 'female-serena',
-    name: 'Serena',
+    id: 'voice-tara',
+    name: 'Tara',
+    meaning: 'Sanskrit & Vedic: "Guiding Star of Compassion"',
     gender: 'female',
-    tone: 'Warm & Calming',
+    tone: 'Warm, Reassuring & Restorative',
     accent: 'British English / Soft Cadence',
-    description: 'A velvety, soothing female cadence ideal for morning meditation, unhurried breathing, and gentle grounding.',
+    description: 'A velvety, soothing British English cadence ideal for morning meditation, unhurried breathing, and gentle emotional grounding.',
     keywords: [
       'google uk english female',
       'victoria',
       'hazel',
+      'serena',
+      'libby',
+      'sonia',
       'stephanie',
       'susan',
-      'serena',
-      'catherine'
+      'catherine',
+      'natural',
+      'neural'
     ],
-    defaultRate: 0.86,
-    defaultPitch: 1.02,
-    sampleText: 'Welcome to your morning sanctuary. Take a gentle breath, soften your posture, and let your thoughts rest in quiet comfort.'
+    preferredLocale: 'en-GB',
+    defaultRate: 0.90,
+    defaultPitch: 1.0,
+    sampleText: 'Welcome to this quiet moment. Soften your posture, take an easy restful breath, and let your thoughts settle into peaceful comfort.'
   },
   {
-    id: 'female-elena',
-    name: 'Elena',
+    id: 'voice-mira',
+    name: 'Mira',
+    meaning: 'Sanskrit: "Ocean of Grace & Mindful Devotion"',
     gender: 'female',
-    tone: 'Bright & Mindful',
-    accent: 'Natural Pacific / Warm & Clear',
-    description: 'An uplifting, organic voice characterized by gentle intonation and clarity, perfect for cultivating gratitude and mental presence.',
+    tone: 'Bright, Mindful & Uplifting',
+    accent: 'Expressive English / Warm Intonation',
+    description: 'An uplifting, organic voice characterized by gentle intonation and clarity, perfect for cultivating gratitude, mental presence, and self-compassion.',
     keywords: [
-      'elena',
       'natural',
+      'neural',
+      'sonia',
+      'elena',
       'karen',
       'fiona',
       'tessa',
@@ -72,70 +89,152 @@ export const CURATED_VOICES: VoiceProfile[] = [
       'siri',
       'google'
     ],
-    defaultRate: 0.90,
-    defaultPitch: 1.04,
-    sampleText: 'Notice this present moment just as it is. Allow gratitude to soften your heart and bring lightness to your day.'
+    preferredLocale: 'any',
+    defaultRate: 0.92,
+    defaultPitch: 1.02,
+    sampleText: 'Notice this present moment, just as it is. Allow gratitude to soften your heart, bringing lightness and calm to your day.'
   },
   {
-    id: 'male-julian',
-    name: 'Julian',
+    id: 'voice-bodhi',
+    name: 'Bodhi',
+    meaning: 'Sanskrit: "Awakening, Deep Insight & Stillness"',
     gender: 'male',
-    tone: 'Grounded & Centered',
-    accent: 'Reassuring Baritone / Classic',
-    description: 'A deep, reassuring male voice with measured cadence, intentional spacing, and steady contemplative presence.',
+    tone: 'Centered, Grounded & Reassuring',
+    accent: 'Classic English Baritone / Steady Cadence',
+    description: 'A deep, reassuring male voice with measured cadence, intentional spacing, and a steady contemplative presence for centered reflection.',
     keywords: [
       'google uk english male',
       'daniel',
       'george',
       'oliver',
       'arthur',
-      'guy'
+      'guy',
+      'prabhat',
+      'rishi',
+      'natural',
+      'neural'
     ],
-    defaultRate: 0.88,
-    defaultPitch: 0.92,
-    sampleText: 'In the quiet space between your thoughts lies true stillness. Be present with whatever is unfolding, without judgment.'
+    preferredLocale: 'en-GB',
+    defaultRate: 0.90,
+    defaultPitch: 0.98,
+    sampleText: 'In the quiet space between your thoughts lies true stillness. Be present with whatever is unfolding, with patience and ease.'
   },
   {
-    id: 'male-marcus',
-    name: 'Marcus',
+    id: 'voice-varun',
+    name: 'Varun',
+    meaning: 'Vedic Mythology: "Lord of Cosmic Waters & Deep Peace"',
     gender: 'male',
-    tone: 'Deep & Resonant',
-    accent: 'Low Contemplative Bass / Decompression',
-    description: 'A low, peaceful bass voice with slow cadence, crafted for evening decompression and releasing tension.',
+    tone: 'Deep, Warm & Resonant Bass',
+    accent: 'Contemplative English / Evening Decompression',
+    description: 'A rich, peaceful bass voice with a slow, soothing cadence, crafted for evening decompression, releasing anxiety, and letting go of the day.',
     keywords: [
+      'prabhat',
+      'rishi',
       'google us english male',
       'david',
       'alex',
       'mark',
       'richard',
-      'rishi',
-      'tom',
-      'fred'
+      'natural',
+      'neural',
+      'guy'
     ],
-    defaultRate: 0.80,
-    defaultPitch: 0.72,
-    sampleText: 'Release the weight of this day. You are safe here in this quiet hour. Rest your mind in complete and effortless peace.'
+    preferredLocale: 'any',
+    defaultRate: 0.88,
+    defaultPitch: 0.96,
+    sampleText: 'Release the weight of this day into the quiet ocean of peace. You are safe here. Rest your mind in complete and effortless calm.'
   },
   {
-    id: 'male-oliver',
-    name: 'Oliver',
+    id: 'voice-kailas',
+    name: 'Kailas',
+    meaning: 'Sacred Himalayan Sanctuary: "Mountain of Serenity"',
     gender: 'male',
-    tone: 'Calm & Reflective',
-    accent: 'Gentle Tenor / Restorative',
-    description: 'A smooth, gentle tenor voice with an empathetic tone, guiding you through reflective journaling with ease.',
+    tone: 'Calm, Gentle Tenor & Empathic',
+    accent: 'Gentle Tenor / Restorative Flow',
+    description: 'A smooth, gentle tenor voice with an empathetic rhythm, guiding you through reflective journaling with ease, patience, and warmth.',
     keywords: [
       'oliver',
       'natural',
       'neural',
       'guy',
       'ryan',
+      'christopher',
+      'daniel',
       'google'
     ],
-    defaultRate: 0.88,
-    defaultPitch: 0.96,
-    sampleText: 'Allow your thoughts to flow freely onto the page. Every feeling you experience is worthy of gentle reflection.'
+    preferredLocale: 'any',
+    defaultRate: 0.90,
+    defaultPitch: 1.0,
+    sampleText: 'Allow your thoughts to flow freely onto the page. Every feeling you experience is worthy of gentle understanding and quiet care.'
   }
 ];
+
+/**
+ * Normalizes any voice ID (including legacy saved IDs) to a current curated voice ID.
+ */
+export function normalizeVoiceId(rawId?: string | null): string {
+  if (!rawId) return CURATED_VOICES[0].id;
+  const lower = rawId.toLowerCase().trim();
+
+  // Modern voice IDs
+  if (lower === 'voice-ananya' || lower === 'ananya') return 'voice-ananya';
+  if (lower === 'voice-tara' || lower === 'tara') return 'voice-tara';
+  if (lower === 'voice-mira' || lower === 'mira') return 'voice-mira';
+  if (lower === 'voice-bodhi' || lower === 'bodhi') return 'voice-bodhi';
+  if (lower === 'voice-varun' || lower === 'varun') return 'voice-varun';
+  if (lower === 'voice-kailas' || lower === 'kailas') return 'voice-kailas';
+
+  // Legacy mappings for backward compatibility
+  if (lower === 'female-celeste' || lower === 'celeste' || lower === 'female-aria' || lower === 'aria') {
+    return 'voice-ananya';
+  }
+  if (lower === 'female-serena' || lower === 'serena') {
+    return 'voice-tara';
+  }
+  if (lower === 'female-elena' || lower === 'elena') {
+    return 'voice-mira';
+  }
+  if (lower === 'male-julian' || lower === 'julian') {
+    return 'voice-bodhi';
+  }
+  if (lower === 'male-marcus' || lower === 'marcus') {
+    return 'voice-varun';
+  }
+  if (lower === 'male-oliver' || lower === 'oliver') {
+    return 'voice-kailas';
+  }
+
+  // Exact ID or name match
+  const exact = CURATED_VOICES.find(v => v.id === rawId || v.name.toLowerCase() === lower);
+  if (exact) return exact.id;
+
+  return CURATED_VOICES[0].id;
+}
+
+/**
+ * Formats reflection or narration text for natural, human-like speech synthesis:
+ * - Strips markdown syntax and symbols.
+ * - Inserts natural comma breath pauses at syntactic junctions.
+ * - Prevents rushed run-on machine speech.
+ */
+export function formatTextForNaturalSpeech(rawText: string): string {
+  if (!rawText) return '';
+  return rawText
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/^\s*[-*•]\s+/gm, '')
+    .replace(/\s*[—–]\s*/g, ', ')
+    .replace(/;/g, ',')
+    .replace(/,([^\s])/g, ', $1')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ', ')
+    .replace(/\.{4,}/g, '...')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
 
@@ -147,7 +246,7 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 }
 
 /**
- * Returns available system voices from the browser.
+ * Returns available system voices from the browser, populating and caching when available.
  */
 export function getAvailableVoices(): SpeechSynthesisVoice[] {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -169,12 +268,10 @@ export function isVoiceFemale(v: SpeechSynthesisVoice): boolean {
   const uri = (v.voiceURI || '').toLowerCase();
   const combined = `${name} ${uri}`;
 
-  // Definite female cues
   if (/female|woman/i.test(combined)) return true;
-  if (/samantha|victoria|karen|zira|aria|jenny|moira|tessa|fiona|hazel|stephanie|susan|catherine|ava|allison|serena|claire|libby|sonia|natasha|kate|elena/i.test(combined)) {
+  if (/samantha|victoria|karen|zira|aria|jenny|moira|tessa|fiona|hazel|stephanie|susan|catherine|ava|allison|serena|claire|libby|sonia|natasha|kate|elena|neerja|ananya/i.test(combined)) {
     if (!/(?<!fe)male/i.test(combined)) return true;
   }
-  // Standard Google US English in Chrome is female
   if (combined.includes('google us english') && !/(?<!fe)male/i.test(combined)) {
     return true;
   }
@@ -191,16 +288,67 @@ export function isVoiceMale(v: SpeechSynthesisVoice): boolean {
   const combined = `${name} ${uri}`;
 
   if (/(?<!fe)male|\bman\b/i.test(combined)) return true;
-  if (/daniel|david|george|oliver|guy|rishi|richard|arthur|tom|mark|alex|fred|james|william|john/i.test(combined)) {
+  if (/daniel|david|george|oliver|guy|rishi|richard|arthur|tom|mark|alex|fred|james|william|john|prabhat|bodhi|varun|kailas/i.test(combined)) {
     return true;
   }
   return false;
 }
 
 /**
+ * Computes a quality and naturalness rating for a browser voice:
+ * - Heavily penalizes robotic legacy synthetic engines (eSpeak, SAPI Desktop).
+ * - Strongly rewards high-fidelity Neural, Natural, Online, Enhanced, and Siri voices.
+ */
+export function rateVoiceNaturalness(voice: SpeechSynthesisVoice): number {
+  const name = (voice.name || '').toLowerCase();
+  const uri = (voice.voiceURI || '').toLowerCase();
+  const combined = `${name} ${uri}`;
+  let score = 100;
+
+  // 1. Strict elimination of robotic desktop/legacy synth engines
+  if (/espeak|desktop|zira desktop|david desktop|mark desktop|hazel desktop|sample|synthesizer|mbrola|festival|klatt/i.test(combined)) {
+    return -9999;
+  }
+
+  // 2. High-Fidelity Neural / Natural voices (Microsoft Edge Natural, Apple Enhanced/Premium)
+  if (/natural|neural|online \(natural\)|wavenet|enhanced|premium|hi-fi/i.test(combined)) {
+    score += 1500;
+  }
+
+  // 3. Apple Siri & Google Cloud voices
+  if (/\bsiri\b/i.test(combined)) {
+    score += 1200;
+  }
+  if (/google us english|google uk english|google english/i.test(combined)) {
+    score += 1000;
+  } else if (/google/i.test(combined)) {
+    score += 800;
+  }
+
+  // 4. Renowned high-quality studio voices
+  if (/ava|jenny|samantha|serena|libby|neerja|sonia|prabhat|rishi|daniel|oliver|victoria/i.test(combined)) {
+    score += 700;
+  }
+
+  // 5. Cloud-rendered voices (localService === false usually means high-bitrate neural service)
+  if (voice.localService === false) {
+    score += 300;
+  }
+
+  // 6. English language match
+  const lang = (voice.lang || '').toLowerCase();
+  if (lang.startsWith('en')) {
+    score += 400;
+  } else {
+    score -= 2000;
+  }
+
+  return score;
+}
+
+/**
  * Matches a chosen voice profile to an actual browser SpeechSynthesisVoice.
- * Ensures Serena and Celeste are naturally soothing female voices, Julian and Marcus are male,
- * and eliminates harsh robotic or synthetic desktop voices.
+ * Eliminates harsh robotic or synthetic desktop voices and picks the highest-fidelity natural voice.
  */
 export function resolveSpeechVoice(
   voiceIdentifier?: string,
@@ -209,139 +357,74 @@ export function resolveSpeechVoice(
   const voices = getAvailableVoices();
   if (!voices.length) return null;
 
-  // Seamlessly alias legacy Aria preference to the new serene Celeste voice
-  const normalizedIdentifier = (voiceIdentifier === 'female-aria' || voiceIdentifier === 'aria')
-    ? 'female-celeste'
-    : voiceIdentifier;
-
-  const matchedProfile = CURATED_VOICES.find(
-    (p) => p.id === normalizedIdentifier || p.name.toLowerCase() === (normalizedIdentifier || '').toLowerCase()
-  );
-
+  const normalizedId = normalizeVoiceId(voiceIdentifier);
+  const matchedProfile = CURATED_VOICES.find((p) => p.id === normalizedId) || CURATED_VOICES[0];
   const targetGender = matchedProfile?.gender || (preferredGender === 'female' || preferredGender === 'male' ? preferredGender : null);
 
-  // Exact match by voiceURI or name (if gender matches)
-  if (normalizedIdentifier) {
-    const exact = voices.find((v) => v.voiceURI === normalizedIdentifier || v.name === normalizedIdentifier);
-    if (exact) {
+  // If exact match by voiceURI or name exists and is not robotic
+  if (voiceIdentifier) {
+    const exact = voices.find((v) => v.voiceURI === voiceIdentifier || v.name === voiceIdentifier);
+    if (exact && rateVoiceNaturalness(exact) > 0) {
       if (!targetGender) return exact;
       if (targetGender === 'female' && !isVoiceMale(exact)) return exact;
       if (targetGender === 'male' && !isVoiceFemale(exact)) return exact;
     }
   }
 
-  const femaleVoices = voices.filter((v) => isVoiceFemale(v));
-  const maleVoices = voices.filter((v) => isVoiceMale(v));
+  // Score all available voices for the best match
+  let bestVoice: SpeechSynthesisVoice | null = null;
+  let highestScore = -Infinity;
 
-  // Profile-specific resolution
-  if (matchedProfile?.id === 'female-serena') {
-    // 1. Natural / UK female voice (Google UK English Female, Victoria, Hazel, Libby, Susan)
-    const ukFemale = femaleVoices.find((v) =>
-      (v.name.toLowerCase().includes('google uk english female') ||
-      /victoria|hazel|susan|stephanie|libby|catherine/i.test(v.name) ||
-      v.lang.toLowerCase().includes('gb')) &&
-      !/zira|desktop|espeak/i.test(v.name)
-    );
-    if (ukFemale) return ukFemale;
+  for (const v of voices) {
+    let score = rateVoiceNaturalness(v);
+    if (score < 0) continue; // Skip robotic voices
 
-    // 2. High quality female voice not robotic
-    const calmFemale = femaleVoices.find((v) => !/zira|desktop|espeak/i.test(v.name));
-    if (calmFemale) return calmFemale;
+    const isFemale = isVoiceFemale(v);
+    const isMale = isVoiceMale(v);
 
-    if (femaleVoices.length > 0) return femaleVoices[0];
-    const notMale = voices.find((v) => !isVoiceMale(v));
-    if (notMale) return notMale;
+    // Gender score
+    if (targetGender === 'female') {
+      if (isFemale) score += 1200;
+      else if (isMale) score -= 3000;
+    } else if (targetGender === 'male') {
+      if (isMale) score += 1200;
+      else if (isFemale) score -= 3000;
+    }
+
+    // Preferred locale
+    const lang = (v.lang || '').toLowerCase();
+    if (matchedProfile.preferredLocale === 'en-GB' && (lang.includes('gb') || /uk|british/i.test(v.name))) {
+      score += 350;
+    } else if (matchedProfile.preferredLocale === 'en-US' && (lang.includes('us') || /us english|united states/i.test(v.name))) {
+      score += 250;
+    }
+
+    // Keyword match
+    const vName = (v.name || '').toLowerCase();
+    for (const kw of matchedProfile.keywords) {
+      if (vName.includes(kw.toLowerCase())) {
+        score += 300;
+      }
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestVoice = v;
+    }
   }
 
-  if (matchedProfile?.id === 'female-celeste') {
-    // 1. Prioritize Natural / Neural / Premium / Enhanced voices (Microsoft Natural, Apple Enhanced)
-    const naturalNeural = femaleVoices.find((v) =>
-      /natural|neural|enhanced|premium|siri/i.test(v.name) &&
-      !/zira|desktop|espeak/i.test(v.name)
-    );
-    if (naturalNeural) return naturalNeural;
+  if (bestVoice) return bestVoice;
 
-    // 2. Renowned soothing, velvety female voices (Ava, Jenny, Samantha, Allison, Libby, Moira, Claire, Sonia)
-    const soothingFemale = femaleVoices.find((v) =>
-      /ava|jenny|samantha|allison|libby|moira|claire|sonia|fiona/i.test(v.name) &&
-      !/zira|desktop|espeak/i.test(v.name)
-    );
-    if (soothingFemale) return soothingFemale;
+  // Fallback: Pick highest quality voice matching gender
+  const genderFiltered = voices.filter((v) => {
+    if (targetGender === 'female') return isVoiceFemale(v) && rateVoiceNaturalness(v) > -500;
+    if (targetGender === 'male') return isVoiceMale(v) && rateVoiceNaturalness(v) > -500;
+    return rateVoiceNaturalness(v) > -500;
+  });
 
-    // 3. Clean Google US English or Google UK female
-    const googleFemale = femaleVoices.find((v) =>
-      v.name.toLowerCase().includes('google') &&
-      !/zira|desktop|espeak/i.test(v.name)
-    );
-    if (googleFemale) return googleFemale;
-
-    // 4. Any female voice that is explicitly not robotic desktop synth
-    const nonRoboticFemale = femaleVoices.find((v) => !/zira|desktop|espeak/i.test(v.name));
-    if (nonRoboticFemale) return nonRoboticFemale;
-
-    if (femaleVoices.length > 0) return femaleVoices[0];
-    const notMale = voices.find((v) => !isVoiceMale(v));
-    if (notMale) return notMale;
-  }
-
-  if (matchedProfile?.id === 'female-elena') {
-    const clearFemale = femaleVoices.find((v) =>
-      /elena|karen|tessa|fiona|siri|aria/i.test(v.name) &&
-      !/zira|desktop|espeak/i.test(v.name)
-    );
-    if (clearFemale) return clearFemale;
-    if (femaleVoices.length > 0) return femaleVoices[0];
-  }
-
-  if (matchedProfile?.id === 'male-julian') {
-    // 1. British / UK male
-    const ukMale = maleVoices.find((v) =>
-      v.name.toLowerCase().includes('google uk english male') ||
-      /daniel|george|oliver|arthur/i.test(v.name) ||
-      v.lang.toLowerCase().includes('gb')
-    );
-    if (ukMale) return ukMale;
-
-    // 2. Any male voice
-    if (maleVoices.length > 0) return maleVoices[0];
-
-    // 3. Fallback
-    const notFemale = voices.find((v) => !isVoiceFemale(v));
-    if (notFemale) return notFemale;
-  }
-
-  if (matchedProfile?.id === 'male-marcus') {
-    // 1. US / Deep male
-    const usMale = maleVoices.find((v) =>
-      v.name.toLowerCase().includes('google us english male') ||
-      /david|alex|mark|richard|tom/i.test(v.name)
-    );
-    if (usMale) return usMale;
-
-    // 2. Secondary male voice if available
-    if (maleVoices.length > 1) return maleVoices[maleVoices.length - 1];
-    if (maleVoices.length > 0) return maleVoices[0];
-
-    // 3. Fallback
-    const notFemale = voices.find((v) => !isVoiceFemale(v));
-    if (notFemale) return notFemale;
-  }
-
-  if (matchedProfile?.id === 'male-oliver') {
-    const tenorMale = maleVoices.find((v) =>
-      /oliver|ryan|guy|christopher|daniel/i.test(v.name) &&
-      !/desktop|espeak/i.test(v.name)
-    );
-    if (tenorMale) return tenorMale;
-    if (maleVoices.length > 0) return maleVoices[0];
-  }
-
-  // Generic gender fallback
-  if (targetGender === 'female' && femaleVoices.length > 0) {
-    return femaleVoices[0];
-  }
-  if (targetGender === 'male' && maleVoices.length > 0) {
-    return maleVoices[0];
+  if (genderFiltered.length > 0) {
+    genderFiltered.sort((a, b) => rateVoiceNaturalness(b) - rateVoiceNaturalness(a));
+    return genderFiltered[0];
   }
 
   return voices[0] || null;
@@ -366,12 +449,13 @@ export function stopVoicePreview(): void {
 }
 
 /**
- * Plays a quick test sample using the selected voice and tailored parameters.
+ * Plays a test sample using the selected voice and tailored parameters.
  * Maintains an active utterance reference so Chrome does not garbage-collect mid-sentence.
+ * Clamps rate and pitch to natural vocal acoustic boundaries to preserve human tone.
  */
 export function previewVoice(
   voice: SpeechSynthesisVoice | null,
-  rate = 0.88,
+  rate = 0.92,
   pitch = 1.0,
   onStart?: () => void,
   onEnd?: () => void,
@@ -384,15 +468,22 @@ export function previewVoice(
 
   stopVoicePreview();
 
-  const text = customSampleText || 'Welcome to your peaceful sanctuary. Take a gentle breath and let your thoughts rest.';
+  const text = formatTextForNaturalSpeech(
+    customSampleText || 'Welcome to your peaceful sanctuary. Take a gentle breath and let your thoughts rest.'
+  );
   const utterance = new SpeechSynthesisUtterance(text);
   activeUtterance = utterance; // Pin to module scope!
 
   if (voice) {
     utterance.voice = voice;
   }
-  utterance.rate = rate;
-  utterance.pitch = pitch;
+
+  // Safe acoustic boundaries: pitch between 0.92 and 1.08 preserves natural throat resonance without robotization
+  const safeRate = Math.min(1.15, Math.max(0.80, rate));
+  const safePitch = Math.min(1.08, Math.max(0.92, pitch));
+
+  utterance.rate = safeRate;
+  utterance.pitch = safePitch;
 
   let hasEnded = false;
   const finish = () => {
@@ -423,12 +514,12 @@ export function previewVoice(
     finish();
   };
 
-  // Chrome safety timer to ensure stop state returns even if browser misses onend event
+  // Safety timer to ensure stop state returns even if browser misses onend event
   activePreviewTimer = setTimeout(() => {
     if (activeUtterance === utterance) {
       finish();
     }
-  }, 14000);
+  }, 16000);
 
   if (window.speechSynthesis.paused) {
     window.speechSynthesis.resume();
@@ -441,59 +532,107 @@ export function previewVoice(
 // 432Hz Ambient Sound Synthesis & Preview
 // ==========================================
 
-let ambientAudioCtx: AudioContext | null = null;
-let ambientOscNode: OscillatorNode | null = null;
-let ambientGainNode: GainNode | null = null;
+interface AmbientSession {
+  ctx: AudioContext;
+  masterGain: GainNode;
+  oscillators: OscillatorNode[];
+  lfo?: OscillatorNode;
+  lfoGain?: GainNode;
+}
+
+let activeAmbientSession: AmbientSession | null = null;
 let ambientTimer: any = null;
 
 /**
  * Checks if 432Hz ambient preview is currently playing.
  */
 export function is432HzPreviewPlaying(): boolean {
-  return ambientOscNode !== null;
+  return activeAmbientSession !== null;
 }
 
 /**
- * Stops the 432Hz ambient sound preview gracefully with a soft audio fade-out.
+ * Stops the 432Hz ambient sound preview gracefully with a soft audio fade-out or immediately.
  */
-export function stop432HzPreview(): void {
+export function stop432HzPreview(immediate = false): void {
   if (ambientTimer) {
     clearTimeout(ambientTimer);
     ambientTimer = null;
   }
-  if (ambientGainNode && ambientAudioCtx) {
+
+  const session = activeAmbientSession;
+  if (!session) return;
+  activeAmbientSession = null; // Unbind immediately so new sessions are never clobbered
+
+  const { ctx, masterGain, oscillators, lfo, lfoGain } = session;
+
+  if (immediate) {
     try {
-      const now = ambientAudioCtx.currentTime;
-      ambientGainNode.gain.cancelScheduledValues(now);
-      ambientGainNode.gain.setValueAtTime(ambientGainNode.gain.value, now);
-      ambientGainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.4);
-    } catch (e) {
-      // Ignored
-    }
+      oscillators.forEach((osc) => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch (_) {}
+      });
+      if (lfo) {
+        try {
+          lfo.stop();
+          lfo.disconnect();
+        } catch (_) {}
+      }
+      if (lfoGain) {
+        try {
+          lfoGain.disconnect();
+        } catch (_) {}
+      }
+      masterGain.disconnect();
+    } catch (_) {}
+    return;
   }
-  setTimeout(() => {
+
+  // Smooth natural fade-out over 350ms
+  try {
+    const now = ctx.currentTime;
+    masterGain.gain.cancelScheduledValues(now);
+    masterGain.gain.setValueAtTime(Math.max(masterGain.gain.value, 0.0001), now);
+    masterGain.gain.exponentialRampToValueAtTime(0.00001, now + 0.35);
+
+    setTimeout(() => {
+      try {
+        oscillators.forEach((osc) => {
+          try {
+            osc.stop();
+            osc.disconnect();
+          } catch (_) {}
+        });
+        if (lfo) {
+          try {
+            lfo.stop();
+            lfo.disconnect();
+          } catch (_) {}
+        }
+        if (lfoGain) {
+          try {
+            lfoGain.disconnect();
+          } catch (_) {}
+        }
+        masterGain.disconnect();
+      } catch (_) {}
+    }, 400);
+  } catch (e) {
+    // Immediate fallback if ramping fails
     try {
-      if (ambientOscNode) {
-        ambientOscNode.stop();
-        ambientOscNode.disconnect();
-        ambientOscNode = null;
-      }
-      if (ambientGainNode) {
-        ambientGainNode.disconnect();
-        ambientGainNode = null;
-      }
-    } catch (e) {
-      // Ignored
-    }
-  }, 450);
+      oscillators.forEach((osc) => osc.stop());
+    } catch (_) {}
+  }
 }
 
 /**
- * Plays a soothing 432Hz sine tone with organic lowpass harmonics for previewing.
- * Auto-fades after 7 seconds or when stopped.
+ * Plays a soothing 432Hz sine tone enriched with warm sub-octave (216Hz) and singing-bowl chime (864Hz).
+ * Resolves browser AudioContext suspension immediately on user click and fades out after 8 seconds.
  */
 export function play432HzPreview(onEnd?: () => void): void {
-  stop432HzPreview();
+  // Immediately terminate any prior session cleanly
+  stop432HzPreview(true);
 
   if (typeof window === 'undefined') {
     onEnd?.();
@@ -503,47 +642,95 @@ export function play432HzPreview(onEnd?: () => void): void {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) {
+      console.warn('Web Audio API is not supported in this environment');
       onEnd?.();
       return;
     }
 
-    if (!ambientAudioCtx) {
-      ambientAudioCtx = new AudioCtx();
+    const ctx = new AudioCtx();
+
+    // Critical: Resume immediately within the user gesture event loop
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch((err) => console.warn('AudioContext resume note:', err));
     }
 
-    if (ambientAudioCtx.state === 'suspended') {
-      ambientAudioCtx.resume();
-    }
+    const now = ctx.currentTime;
 
-    const osc = ambientAudioCtx.createOscillator();
-    const filter = ambientAudioCtx.createBiquadFilter();
-    const gain = ambientAudioCtx.createGain();
+    // Master volume control with gentle fade-in ramp
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.0001, now);
+    // Smooth fade in to a warm, clearly audible soothing level (0.16)
+    masterGain.gain.exponentialRampToValueAtTime(0.16, now + 0.5);
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(432, ambientAudioCtx.currentTime); // 432 Hz Calming harmonic
-
-    // Warm, soft acoustic lowpass filter
+    // Warm biquad lowpass filter (simulates Tibetan singing bowl acoustics)
+    const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(750, ambientAudioCtx.currentTime);
+    filter.frequency.setValueAtTime(850, now);
+    filter.Q.setValueAtTime(1.5, now);
 
-    // Soft organic volume envelope
-    const now = ambientAudioCtx.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.038, now + 1.0);
+    // 1. Primary 432 Hz Healing Fundamental Tone
+    const oscFundamental = ctx.createOscillator();
+    oscFundamental.type = 'sine';
+    oscFundamental.frequency.setValueAtTime(432, now);
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(ambientAudioCtx.destination);
+    const fundamentalGain = ctx.createGain();
+    fundamentalGain.gain.setValueAtTime(0.75, now);
+    oscFundamental.connect(fundamentalGain);
+    fundamentalGain.connect(filter);
 
-    osc.start();
-    ambientOscNode = osc;
-    ambientGainNode = gain;
+    // 2. Harmonic Sub-Octave (216 Hz warm grounding resonance)
+    const oscSub = ctx.createOscillator();
+    oscSub.type = 'sine';
+    oscSub.frequency.setValueAtTime(216, now);
 
-    // Auto fade-out after 7 seconds
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.25, now);
+    oscSub.connect(subGain);
+    subGain.connect(filter);
+
+    // 3. Gentle Crystalline Overtone (864 Hz chime resonance)
+    const oscOvertone = ctx.createOscillator();
+    oscOvertone.type = 'sine';
+    oscOvertone.frequency.setValueAtTime(864, now);
+
+    const overtoneGain = ctx.createGain();
+    overtoneGain.gain.setValueAtTime(0.08, now);
+    oscOvertone.connect(overtoneGain);
+    overtoneGain.connect(filter);
+
+    // 4. Meditative Breath Modulation (0.15 Hz slow calming breath wave)
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(0.15, now);
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.setValueAtTime(0.035, now);
+    lfo.connect(lfoGain);
+    lfoGain.connect(masterGain.gain);
+
+    // Route filter -> masterGain -> destination
+    filter.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    // Start all audio nodes
+    oscFundamental.start(now);
+    oscSub.start(now);
+    oscOvertone.start(now);
+    lfo.start(now);
+
+    const session: AmbientSession = {
+      ctx,
+      masterGain,
+      oscillators: [oscFundamental, oscSub, oscOvertone],
+      lfo,
+      lfoGain
+    };
+    activeAmbientSession = session;
+
+    // Auto fade-out after 8 seconds of peaceful preview
     ambientTimer = setTimeout(() => {
-      stop432HzPreview();
+      stop432HzPreview(false);
       onEnd?.();
-    }, 7000);
+    }, 8000);
   } catch (err) {
     console.warn('432Hz preview audio note:', err);
     onEnd?.();

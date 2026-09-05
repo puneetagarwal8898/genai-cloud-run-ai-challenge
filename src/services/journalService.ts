@@ -229,6 +229,20 @@ export async function wipeAllUserData(userId: string, userEmail?: string): Promi
         localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
       }
     }
+
+    // Clean 2FA registry if userEmail or userId is provided
+    try {
+      const twoFaRaw = localStorage.getItem('reflectai_2fa_registry');
+      if (twoFaRaw) {
+        const twoFa = JSON.parse(twoFaRaw);
+        if (userId && twoFa[userId]) delete twoFa[userId];
+        if (userEmail) {
+          const sanitized = userEmail.trim().toLowerCase();
+          if (twoFa[sanitized]) delete twoFa[sanitized];
+        }
+        localStorage.setItem('reflectai_2fa_registry', JSON.stringify(twoFa));
+      }
+    } catch (twoFaCleanErr) {}
   } catch (err) {
     console.warn("Local storage wipe warning:", err);
   }

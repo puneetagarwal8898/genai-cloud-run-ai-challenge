@@ -296,32 +296,40 @@ export const Dashboard: React.FC = () => {
   // Email verification gate: email auth accounts require emailVerified: true to converse
   const isEmailUnverified = userProfile?.authProvider === 'email' && !userProfile?.emailVerified;
 
-  // Responsive UI state: Hide button labels synchronously across the cluster if space is constrained or text doesn't fit
-  const [showModeLabels, setShowModeLabels] = useState<boolean>(true);
+  // Mobile layout state: switch between Dialogue and History on small screens
+  const [mobileTab, setMobileTab] = useState<'reflection' | 'history'>('reflection');
+
+  // Responsive UI state: Show full text labels on wide screens, collapse gracefully to icons on small screens
+  const [showModeLabels, setShowModeLabels] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth >= 640 : true);
   const [showHeaderNavLabels, setShowHeaderNavLabels] = useState<boolean>(true);
   const [showComposerActionLabels, setShowComposerActionLabels] = useState<boolean>(true);
+  const chatHeaderRef = useRef<HTMLDivElement | null>(null);
   const modeBarContainerRef = useRef<HTMLDivElement | null>(null);
   const headerNavContainerRef = useRef<HTMLDivElement | null>(null);
   const composerActionsContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-adjust layout & responsiveness: monitor container widths and font-scaling
   useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return;
-
-    // Observe Reflection Modes Bar container
-    const modeObserver = new ResizeObserver(() => {
-      if (modeBarContainerRef.current) {
-        // Measure whether the container is cramped or if font size is enlarged.
-        // 4 mode buttons with full text take ~420px to render comfortably without any clipping.
-        // If parent container width is under 440px, gracefully collapse ALL mode buttons to icons only.
-        const containerWidth = modeBarContainerRef.current.clientWidth;
-        setShowModeLabels(containerWidth >= 440);
+    // Dynamic observer for Chat Box Header: controls whether the 4 mode tabs (Brainstorm, Reflection, Summary, Advice) show full text
+    // On big screen / container >= 500px, show text without any overlap. On smaller screens / resized down, collapse to icons.
+    const updateModeLabelsCapacity = () => {
+      if (chatHeaderRef.current) {
+        const headerWidth = chatHeaderRef.current.clientWidth;
+        setShowModeLabels(headerWidth >= 500);
+      } else if (typeof window !== 'undefined') {
+        setShowModeLabels(window.innerWidth >= 640);
       }
-    });
+    };
 
-    if (modeBarContainerRef.current) {
-      modeObserver.observe(modeBarContainerRef.current);
+    let headerObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && chatHeaderRef.current) {
+      headerObserver = new ResizeObserver(() => {
+        updateModeLabelsCapacity();
+      });
+      headerObserver.observe(chatHeaderRef.current);
     }
+    updateModeLabelsCapacity();
+    window.addEventListener('resize', updateModeLabelsCapacity);
 
     // Manage Desktop Header Nav labels: only display full text on wide viewports (1280px+)
     // to strictly guarantee zero button or text overlap across all devices and zoom levels
@@ -334,22 +342,22 @@ export const Dashboard: React.FC = () => {
     window.addEventListener('resize', updateHeaderCapacity);
 
     // Observe Composer Actions container (Mic, Tag Place, Time Capsule)
-    const composerActionsObserver = new ResizeObserver(() => {
-      if (composerActionsContainerRef.current) {
-        const containerWidth = composerActionsContainerRef.current.clientWidth;
-        // When space is constrained (under 280px), synchronize collapsing both buttons to icons only
-        setShowComposerActionLabels(containerWidth >= 280);
-      }
-    });
-
-    if (composerActionsContainerRef.current) {
+    let composerActionsObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && composerActionsContainerRef.current) {
+      composerActionsObserver = new ResizeObserver(() => {
+        if (composerActionsContainerRef.current) {
+          const containerWidth = composerActionsContainerRef.current.clientWidth;
+          setShowComposerActionLabels(containerWidth >= 280);
+        }
+      });
       composerActionsObserver.observe(composerActionsContainerRef.current);
     }
 
     return () => {
-      modeObserver.disconnect();
+      if (headerObserver) headerObserver.disconnect();
       window.removeEventListener('resize', updateHeaderCapacity);
-      composerActionsObserver.disconnect();
+      window.removeEventListener('resize', updateModeLabelsCapacity);
+      if (composerActionsObserver) composerActionsObserver.disconnect();
     };
   }, []);
 
@@ -424,6 +432,7 @@ export const Dashboard: React.FC = () => {
       ]);
     }
     setActionError(null);
+    setMobileTab('reflection');
   };
 
   const startNewEntry = () => {
@@ -436,6 +445,7 @@ export const Dashboard: React.FC = () => {
     setSuggestedPrompts([]);
     setActionError(null);
     setStatusMessage(null);
+    setMobileTab('reflection');
   };
 
   const handleUpdateActiveReflectionLocation = async (loc: SanctuaryLocation | null) => {
@@ -463,27 +473,27 @@ export const Dashboard: React.FC = () => {
     switch (m) {
       case 'brainstorm':
         return [
-          "Which of these ideas has the lowest friction to start?",
-          "How can we turn this into a 3-step action plan?",
-          "What is an unconventional alternative to explore?"
+          "Can you help me map out the very first frictionless step?",
+          "What is an unconventional, creative angle we haven't considered?",
+          "If I had zero fear of failing, how would I approach this?"
         ];
       case 'summary':
         return [
-          "What is the single most important takeaway here?",
-          "How does this align with my deeper priorities?",
-          "What mindset shift will help anchor this?"
+          "What is the core emotional truth underneath all of this?",
+          "How can I turn these realizations into daily habits?",
+          "What old story or mindset do I need to let go of?"
         ];
       case 'advice':
         return [
-          "Can you break down step one in more detail?",
-          "What potential obstacles should I prepare for?",
-          "How can I maintain calm consistency with this?"
+          "Can you walk me through the hardest part of putting this into practice?",
+          "How do I handle feelings of doubt or resistance when they arise?",
+          "What does self-compassion look like for me right now in this situation?"
         ];
       default:
         return [
-          "What underlying feeling is driving this thought?",
-          "How might I view this situation with more self-compassion?",
-          "What would clarity look like one week from today?"
+          "Can we explore what underlying need or fear is surfacing here?",
+          "How can I look at this experience with more gentleness and curiosity?",
+          "What would my wisest, most grounded future self tell me today?"
         ];
     }
   };
@@ -1374,9 +1384,51 @@ export const Dashboard: React.FC = () => {
 
       {/* Main Two-Column Layout */}
       <div className="flex-1 max-w-7xl mx-auto w-full flex flex-col md:flex-row overflow-hidden p-3 sm:p-5 gap-3 sm:gap-5">
+        {/* Mobile View Switcher: allows phones to toggle between Reflection Dialogue and History without vertical cramping */}
+        <div
+          className="flex md:hidden items-center justify-center p-1 rounded-xl border shrink-0 gap-1 w-full"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-color)'
+          }}
+        >
+          <button
+            type="button"
+            id="mobile-tab-reflection-btn"
+            onClick={() => setMobileTab('reflection')}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[40px] ${
+              mobileTab === 'reflection' ? 'text-white shadow-xs' : 'hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor: mobileTab === 'reflection' ? 'var(--accent)' : 'transparent',
+              color: mobileTab === 'reflection' ? '#ffffff' : 'var(--text-secondary)'
+            }}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Reflect & Dialogue</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-tab-history-btn"
+            onClick={() => setMobileTab('history')}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[40px] ${
+              mobileTab === 'history' ? 'text-white shadow-xs' : 'hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor: mobileTab === 'history' ? 'var(--accent)' : 'transparent',
+              color: mobileTab === 'history' ? '#ffffff' : 'var(--text-secondary)'
+            }}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>History ({interactions.length})</span>
+          </button>
+        </div>
+
         {/* Left Sidebar: Entries & History with smooth Motion animation */}
         <aside
-          className="w-full md:w-80 flex flex-col rounded-2xl border shadow-xl overflow-hidden shrink-0 h-[340px] md:h-auto transition-colors"
+          className={`w-full md:w-80 flex flex-col rounded-2xl border shadow-xl overflow-hidden shrink-0 transition-colors ${
+            mobileTab === 'history' ? 'flex flex-1 min-h-[400px]' : 'hidden md:flex md:h-auto'
+          }`}
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-color)'
@@ -1609,7 +1661,9 @@ export const Dashboard: React.FC = () => {
 
         {/* Right Section: Journal Composer & Interactive Dialogue */}
         <main
-          className="flex-1 flex flex-col rounded-2xl border shadow-xl overflow-hidden transition-colors"
+          className={`flex-1 flex flex-col rounded-2xl border shadow-xl overflow-hidden transition-colors ${
+            mobileTab === 'reflection' ? 'flex min-h-[480px]' : 'hidden md:flex'
+          }`}
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-color)'
@@ -1617,14 +1671,15 @@ export const Dashboard: React.FC = () => {
         >
           {/* Top Active Bar */}
           <div
+            ref={chatHeaderRef}
             className="p-3 sm:p-3.5 border-b flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar"
             style={{
               backgroundColor: 'var(--bg-card-elevated)',
               borderColor: 'var(--border-color)'
             }}
           >
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+            <div className="flex items-center gap-2 shrink min-w-0">
+              <span className="text-xs font-semibold uppercase tracking-wider truncate shrink-0" style={{ color: 'var(--text-primary)' }}>
                 {activeInteractionId ? "Active Reflection" : "New Reflection"}
               </span>
 
@@ -1633,7 +1688,7 @@ export const Dashboard: React.FC = () => {
                 const activeItem = interactions.find(i => i.id === activeInteractionId);
                 if (!activeItem) return null;
                 return (
-                  <div className="hidden sm:flex items-center gap-1.5">
+                  <div className="hidden sm:flex items-center gap-1.5 shrink-0">
                     {activeItem.location && (
                       <button
                         type="button"
@@ -1650,13 +1705,13 @@ export const Dashboard: React.FC = () => {
                         title={`Attached Place: ${activeItem.location.placeName}. Click to edit or remove.`}
                       >
                         <MapPin className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate max-w-[120px]">{activeItem.location.placeName}</span>
+                        <span className="truncate max-w-[110px]">{activeItem.location.placeName}</span>
                         <Check className="w-2.5 h-2.5 shrink-0" />
                       </button>
                     )}
                     {activeItem.timeCapsule && (
                       <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-medium"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-medium shrink-0"
                         style={{
                           backgroundColor: 'rgba(217, 119, 6, 0.08)',
                           borderColor: 'rgba(217, 119, 6, 0.3)',
@@ -1678,16 +1733,16 @@ export const Dashboard: React.FC = () => {
                   icon={<Trash2 className="w-3 h-3 text-red-400" />}
                   label="Delete"
                   description="Delete this reflection permanently"
-                  showText={showModeLabels}
+                  showText={false}
                   onClick={(e) => requestDelete(activeInteractionId, e)}
                   ariaLabel="Delete this reflection permanently"
-                  className="px-2 py-0.5 rounded-lg border text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition"
+                  className="px-2 py-0.5 rounded-lg border text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition shrink-0"
                   style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}
                 />
               )}
               {statusMessage && (
                 <span
-                  className="text-[11px] px-2 py-0.5 rounded font-mono transition-opacity"
+                  className="text-[11px] px-2 py-0.5 rounded font-mono transition-opacity truncate max-w-[120px]"
                   style={{
                     backgroundColor: 'var(--accent-light)',
                     color: 'var(--accent)',
@@ -1699,19 +1754,21 @@ export const Dashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Reflection Modes Selector with dynamic auto-adjusting responsive labels */}
+            {/* Reflection Modes Selector with dynamic auto-adjusting responsive labels: Brainstorm, Reflection, Summary, Advice */}
             <div
               ref={modeBarContainerRef}
-              className="flex items-center gap-1 p-1 rounded-xl border shrink-0"
+              role="tablist"
+              aria-label="Reflection Modes"
+              className="flex items-center gap-1 p-1 rounded-xl border shrink-0 ml-auto"
               style={{
                 backgroundColor: 'var(--bg-canvas)',
                 borderColor: 'var(--border-color)'
               }}
             >
-              {(['reflection', 'brainstorm', 'summary', 'advice'] as ReflectionMode[]).map(m => {
+              {(['brainstorm', 'reflection', 'summary', 'advice'] as ReflectionMode[]).map(m => {
                 const labelMap: Record<ReflectionMode, { label: string; desc: string }> = {
+                  brainstorm: { label: 'Brainstorm', desc: 'Creative ideas, angles, and possibilities' },
                   reflection: { label: 'Reflection', desc: 'Contemplative inquiry and mindful exploration' },
-                  brainstorm: { label: 'Brainstorm', desc: 'Creative ideas and possibilities' },
                   summary: { label: 'Summary', desc: 'Distill core essence and main takeaways' },
                   advice: { label: 'Advice', desc: 'Actionable guidance and next steps' }
                 };
@@ -1729,7 +1786,7 @@ export const Dashboard: React.FC = () => {
                     active={isSelected}
                     onClick={() => setMode(m)}
                     ariaLabel={`${info.label} Mode — ${info.desc}`}
-                    className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                    className="text-xs px-2.5 py-1.5 rounded-lg font-medium"
                     activeStyle={{
                       backgroundColor: 'var(--accent)',
                       color: '#ffffff',
@@ -1825,8 +1882,9 @@ export const Dashboard: React.FC = () => {
                     {msg.role === 'model' && (
                       <AudioNarrationPlayer
                         textToRead={msg.text}
-                        voiceRate={userProfile?.preferences?.voiceRate || 0.95}
+                        voiceRate={userProfile?.preferences?.voiceRate || 0.92}
                         voicePitch={userProfile?.preferences?.voicePitch || 1.0}
+                        selectedVoiceId={userProfile?.preferences?.selectedVoiceId}
                         selectedVoiceURI={userProfile?.preferences?.selectedVoiceURI}
                         selectedVoiceGender={userProfile?.preferences?.selectedVoiceGender}
                         ambientSoundEnabled={userProfile?.preferences?.ambientSound ?? true}
@@ -1900,29 +1958,32 @@ export const Dashboard: React.FC = () => {
 
             {/* Clickable suggested future prompts after AI finishes responding */}
             {!isSubmitting && suggestedPrompts.length > 0 && conversationTrail.length > 0 && (
-              <div className="pt-2 animate-fadeIn space-y-2">
-                <div className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                  <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-                  <span>Explore deeper with a follow-up:</span>
+              <div className="pt-3 animate-fadeIn space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                  <span>Meaningful follow-ups to explore next:</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2.5">
                   {suggestedPrompts.map((suggestion, sIdx) => (
                     <button
                       key={sIdx}
                       id={`suggested-prompt-${sIdx}`}
+                      type="button"
                       onClick={() => handleSuggestedPromptClick(suggestion)}
-                      className="group text-left px-3.5 py-2 rounded-xl border text-xs font-medium transition-all flex items-center gap-2 cursor-pointer hover:shadow-md"
+                      aria-label={`Ask follow-up question: ${suggestion}`}
+                      className="group text-left px-3.5 py-2.5 rounded-xl border text-xs font-medium transition-all duration-150 flex items-center gap-2.5 cursor-pointer shadow-xs hover:shadow-md hover:border-[var(--accent)] active:scale-[0.98] min-h-[42px] max-w-full"
                       style={{
                         backgroundColor: 'var(--bg-card-elevated)',
                         borderColor: 'var(--border-color)',
                         color: 'var(--text-primary)'
                       }}
                     >
-                      <span className="text-[11px] flex-1 leading-snug">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 group-hover:scale-125 transition-transform" />
+                      <span className="text-[12px] flex-1 leading-snug font-normal group-hover:text-[var(--accent)] transition-colors">
                         {suggestion}
                       </span>
                       <ArrowRight
-                        className="w-3.5 h-3.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity"
+                        className="w-3.5 h-3.5 shrink-0 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
                         style={{ color: 'var(--accent)' }}
                       />
                     </button>
@@ -2030,7 +2091,7 @@ export const Dashboard: React.FC = () => {
                       {/* Location-Aware Sanctuary Journey Tagger (single place per reflection) */}
                       <ResponsiveIconButton
                         id="tag-location-btn"
-                        icon={<MapPin className={`w-3.5 h-3.5 ${stagedLocation ? 'text-amber-500' : 'text-stone-400 dark:text-stone-500'}`} />}
+                        icon={<MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
                         badge={stagedLocation ? <Check className="w-3.5 h-3.5 text-amber-500 stroke-[2.5] shrink-0" /> : undefined}
                         label={stagedLocation ? stagedLocation.placeName : 'Tag Place'}
                         description={stagedLocation ? 'Attached sanctuary place • Hover or tap to see location, click to edit' : 'Tag a tranquil place where you wrote this reflection'}
