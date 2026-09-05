@@ -75,8 +75,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 }) => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
-  if (!isOpen) return null;
-
   const toggleFaq = (index: number) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
   };

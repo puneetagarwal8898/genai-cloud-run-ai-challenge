@@ -26,6 +26,7 @@ interface LocationSanctuaryModalProps {
   onLocationTagged: (location: SanctuaryLocation) => void;
   existingLocation?: SanctuaryLocation;
   interactionsWithLocation?: JournalInteraction[];
+  activeInteraction?: JournalInteraction | null;
 }
 
 const SANCTUARY_PRESETS = [
@@ -570,7 +571,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
               "{selectedPin.prompt}"
             </p>
             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              {new Date(selectedPin.timestamp).toLocaleDateString()}
+              {new Date(selectedPin.timestamp || selectedPin.createdAt).toLocaleDateString()}
             </p>
           </div>
         )}

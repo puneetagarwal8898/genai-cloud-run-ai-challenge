@@ -18,6 +18,7 @@ export interface TimeCapsuleData {
   isOpened?: boolean;
   sealDate: string;
   unlockDate: string;
+  unlocksAt?: string;
   openedDate?: string;
   capsulePrompt?: string;
   growthSummary?: string;
@@ -80,6 +81,8 @@ export interface JournalInteraction {
   }>;
   createdAt: string;
   updatedAt: string;
+  timestamp?: string | number;
+  response?: string;
   // Standout capabilities
   mood?: SanctuaryMood;
   location?: SanctuaryLocation;

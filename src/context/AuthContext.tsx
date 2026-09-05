@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingVerification, setPendingVerification] = useState<{ email: string; demoCode: string } | null>(null);
+  const [pendingVerification, setPendingVerification] = useState<PendingVerification | null>(null);
   const [lastUsedProvider, setLastUsedProvider] = useState<AuthProviderType | null>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);

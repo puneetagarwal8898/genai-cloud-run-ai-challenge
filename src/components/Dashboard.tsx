@@ -45,6 +45,7 @@ import { TimeCapsuleModal } from './TimeCapsuleModal';
 import { LocationSanctuaryModal } from './LocationSanctuaryModal';
 import { AboutModal } from './AboutModal';
 import { LegalModal } from './LegalModal';
+import { ErrorBoundary } from './ErrorBoundary';
 import { AudioNarrationPlayer } from './AudioNarrationPlayer';
 import { SanctuaryVoiceInput } from './SanctuaryVoiceInput';
 import { InfoTooltip } from './InfoTooltip';
@@ -2085,16 +2086,18 @@ export const Dashboard: React.FC = () => {
       />
 
       {/* Standout Feature 3: Serenity Time Capsule - Sealed Mindful Letters Modal */}
-      <TimeCapsuleModal
-        isOpen={showTimeCapsule}
-        onClose={() => setShowTimeCapsule(false)}
-        userId={currentUserId}
-        interactions={interactions}
-        activeInteraction={interactions.find(i => i.id === activeInteractionId) || null}
-        onCapsuleUpdated={(updated) => {
-          setInteractions(prev => prev.map(i => i.id === updated.id ? updated : i));
-        }}
-      />
+      <ErrorBoundary fallbackTitle="Time Capsule is taking a mindful breath">
+        <TimeCapsuleModal
+          isOpen={showTimeCapsule}
+          onClose={() => setShowTimeCapsule(false)}
+          userId={currentUserId}
+          interactions={interactions}
+          activeInteraction={interactions.find(i => i.id === activeInteractionId) || null}
+          onCapsuleUpdated={(updated) => {
+            setInteractions(prev => prev.map(i => i.id === updated.id ? updated : i));
+          }}
+        />
+      </ErrorBoundary>
 
       {/* Standout Feature 4: Location-Aware Sanctuary Journey Modal */}
       <LocationSanctuaryModal
@@ -2106,28 +2109,30 @@ export const Dashboard: React.FC = () => {
       />
 
       {/* About & FAQ Modal */}
-      <AboutModal
-        isOpen={showAboutModal}
-        onClose={() => {
-          setShowAboutModal(false);
-          setNavigatedFromSettings(false);
-        }}
-        onOpenPrivacy={() => {
-          setLegalModalTab('privacy');
-          setShowAboutModal(false);
-          setShowLegalModal(true);
-        }}
-        onOpenTerms={() => {
-          setLegalModalTab('terms');
-          setShowAboutModal(false);
-          setShowLegalModal(true);
-        }}
-        onBack={navigatedFromSettings ? () => {
-          setShowAboutModal(false);
-          setNavigatedFromSettings(false);
-          setShowSettingsModal(true);
-        } : undefined}
-      />
+      <ErrorBoundary fallbackTitle="About sanctuary is taking a mindful breath">
+        <AboutModal
+          isOpen={showAboutModal}
+          onClose={() => {
+            setShowAboutModal(false);
+            setNavigatedFromSettings(false);
+          }}
+          onOpenPrivacy={() => {
+            setLegalModalTab('privacy');
+            setShowAboutModal(false);
+            setShowLegalModal(true);
+          }}
+          onOpenTerms={() => {
+            setLegalModalTab('terms');
+            setShowAboutModal(false);
+            setShowLegalModal(true);
+          }}
+          onBack={navigatedFromSettings ? () => {
+            setShowAboutModal(false);
+            setNavigatedFromSettings(false);
+            setShowSettingsModal(true);
+          } : undefined}
+        />
+      </ErrorBoundary>
 
       {/* Privacy Policy & Terms of Service Modal */}
       <LegalModal
