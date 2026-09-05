@@ -119,6 +119,15 @@ export async function recordExportDownload(
     }
   }
 
+  // 3. Dispatch global event to instantly notify listeners (e.g. ExportDownloadHistory components)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('reflectai_export_recorded', {
+        detail: { userId, record: fullRecord }
+      })
+    );
+  }
+
   return fullRecord;
 }
 

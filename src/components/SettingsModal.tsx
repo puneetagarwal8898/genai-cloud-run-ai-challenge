@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { CURATED_VOICES, resolveSpeechVoice, previewVoice, VoiceProfile } from '../utils/voiceUtils';
+import { CURATED_VOICES, resolveSpeechVoice, previewVoice, stopVoicePreview, VoiceProfile } from '../utils/voiceUtils';
 import { verifyTotpToken } from '../utils/totp';
 import { ExportDownloadHistory } from './ExportDownloadHistory';
 
@@ -73,7 +73,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [voiceRate, setVoiceRate] = useState(userProfile?.preferences?.voiceRate ?? userProfile?.preferences?.voiceSpeed ?? 0.95);
   const [voicePitch, setVoicePitch] = useState(userProfile?.preferences?.voicePitch || 1.0);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(() => {
-    return userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id') || CURATED_VOICES[0].id;
+    const rawId = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
+    if (rawId === 'female-aria' || rawId === 'aria') return 'female-celeste';
+    return rawId || CURATED_VOICES[0].id;
   });
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
 
@@ -107,7 +109,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setDisplayName(userProfile?.displayName || user?.displayName || '');
       setSelectedAvatar(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
       setCustomAvatarUrl('');
-      setSelectedVoiceId(userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id') || CURATED_VOICES[0].id);
+      const rawVoice = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
+      setSelectedVoiceId(rawVoice === 'female-aria' || rawVoice === 'aria' ? 'female-celeste' : (rawVoice || CURATED_VOICES[0].id));
       setPreviewingVoiceId(null);
       setTwoFactorNotice(null);
       setSaveSuccess(false);
@@ -123,9 +126,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && !isDeleting) {
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-        }
+        stopVoicePreview();
+        setPreviewingVoiceId(null);
         onClose();
       }
     };
@@ -134,19 +136,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      stopVoicePreview();
     };
   }, [isOpen, onClose, isDeleting]);
+
+  // Stop voice preview when switching tabs
+  React.useEffect(() => {
+    stopVoicePreview();
+    setPreviewingVoiceId(null);
+  }, [activeTab]);
 
   if (!isOpen) return null;
 
   const handlePreviewVoice = (voiceProfile: VoiceProfile) => {
     if (previewingVoiceId === voiceProfile.id) {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopVoicePreview();
       setPreviewingVoiceId(null);
       return;
     }
+    stopVoicePreview();
     setPreviewingVoiceId(voiceProfile.id);
     const resolved = resolveSpeechVoice(voiceProfile.id, voiceProfile.gender);
     previewVoice(
@@ -154,6 +162,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       voiceRate || voiceProfile.defaultRate,
       voicePitch || voiceProfile.defaultPitch,
       () => {
+        // onStart: ensure UI reflects active playing state with stop icon
+        setPreviewingVoiceId(voiceProfile.id);
+      },
+      () => {
+        // onEnd: return to play sample icon when speech finishes
         setPreviewingVoiceId(null);
       },
       voiceProfile.sampleText
@@ -1055,7 +1068,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="button"
                   id="open-export-pdf-modal-btn"
                   onClick={() => {
-                    onClose();
                     onOpenExportPdf?.();
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer border flex items-center gap-1.5 hover:opacity-85"

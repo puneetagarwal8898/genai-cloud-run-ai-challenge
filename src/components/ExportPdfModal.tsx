@@ -13,6 +13,7 @@ interface ExportPdfModalProps {
   interactions: JournalInteraction[];
   userProfile: UserProfile | null;
   onOpenTwoFactorSetup?: () => void;
+  onExportSuccess?: () => void;
 }
 
 export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
@@ -20,7 +21,8 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
   onClose,
   interactions,
   userProfile,
-  onOpenTwoFactorSetup
+  onOpenTwoFactorSetup,
+  onExportSuccess
 }) => {
   const [accountPassword, setAccountPassword] = useState('');
   const [filePassword, setFilePassword] = useState('');
@@ -135,9 +137,9 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
 
       setRefreshHistory((prev) => prev + 1);
       setSuccess(true);
-      setTimeout(() => {
-        setIsExporting(false);
-      }, 1500);
+      setIsExporting(false);
+      onExportSuccess?.();
+      onClose();
     } catch (err: any) {
       console.error('PDF export error:', err);
       setError('Failed to generate encrypted PDF. Please try again.');
@@ -149,7 +151,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
     <AnimatePresence>
       <div
         id="export-pdf-backdrop"
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+        className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
         style={{
           backgroundColor: 'rgba(15, 23, 42, 0.75)',
           backdropFilter: 'blur(8px)'

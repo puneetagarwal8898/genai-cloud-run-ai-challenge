@@ -43,6 +43,29 @@ export const ExportDownloadHistory: React.FC<ExportDownloadHistoryProps> = ({
       });
   }, [userId, refreshTrigger]);
 
+  // Listen to new export events globally so the history list updates in real-time
+  useEffect(() => {
+    if (!userId) return;
+
+    const handleExportRecorded = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (!customEvent.detail?.userId || customEvent.detail.userId === userId) {
+        const cached = getCachedExportHistory(userId);
+        if (cached.length > 0) {
+          setRecords(cached);
+        }
+        fetchExportHistory(userId).then((data) => {
+          setRecords(data);
+        });
+      }
+    };
+
+    window.addEventListener('reflectai_export_recorded', handleExportRecorded);
+    return () => {
+      window.removeEventListener('reflectai_export_recorded', handleExportRecorded);
+    };
+  }, [userId]);
+
   const togglePasswordVisibility = (id: string) => {
     setUnmaskedPasswords((prev) => ({
       ...prev,

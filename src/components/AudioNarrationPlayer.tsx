@@ -119,8 +119,9 @@ export const AudioNarrationPlayer: React.FC<AudioNarrationPlayerProps> = ({
 
       // Select user's chosen voice or gentle natural voice
       const storedVoiceURI = typeof window !== 'undefined' ? localStorage.getItem('reflectai_selected_voice_uri') || undefined : undefined;
-      const targetVoiceURI = selectedVoiceURI || storedVoiceURI;
-      const resolvedVoice = resolveSpeechVoice(targetVoiceURI, selectedVoiceGender);
+      const storedVoiceId = typeof window !== 'undefined' ? localStorage.getItem('reflectai_selected_voice_id') || undefined : undefined;
+      const targetVoice = selectedVoiceURI || storedVoiceId || storedVoiceURI;
+      const resolvedVoice = resolveSpeechVoice(targetVoice, selectedVoiceGender);
 
       if (resolvedVoice) {
         utterance.voice = resolvedVoice;

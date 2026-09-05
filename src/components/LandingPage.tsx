@@ -262,43 +262,6 @@ export const LandingPage: React.FC = () => {
 
             <ThemeSelector />
 
-            {/* About Sanctuary Button for non-logged in visitors */}
-            <button
-              id="landing-header-about-btn"
-              type="button"
-              onClick={() => setIsAboutOpen(true)}
-              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-secondary)'
-              }}
-              title="Learn more about ReflectAI Sanctuary"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline">About</span>
-            </button>
-
-            {/* Terms & Privacy Button for non-logged in visitors */}
-            <button
-              id="landing-header-legal-btn"
-              type="button"
-              onClick={() => {
-                setLegalInitialTab('privacy');
-                setIsLegalOpen(true);
-              }}
-              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-secondary)'
-              }}
-              title="Read Privacy Policy and Terms of Service"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="hidden sm:inline">Terms & Privacy</span>
-            </button>
-
             {/* Test Sandbox button only visible in Test Environment */}
             {isTestActive && (
               <button
@@ -1035,36 +998,35 @@ export const LandingPage: React.FC = () => {
             id="landing-footer-about-btn"
             type="button"
             onClick={() => setIsAboutOpen(true)}
-            className="hover:underline cursor-pointer font-medium transition"
-            style={{ color: 'var(--text-secondary)' }}
+            className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-secondary)'
+            }}
+            title="Learn more about ReflectAI Sanctuary"
           >
-            About Sanctuary
+            <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+            <span>About</span>
           </button>
-          <span>&bull;</span>
+
           <button
-            id="landing-footer-privacy-btn"
+            id="landing-footer-legal-btn"
             type="button"
             onClick={() => {
               setLegalInitialTab('privacy');
               setIsLegalOpen(true);
             }}
-            className="hover:underline cursor-pointer font-medium transition"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Privacy Policy
-          </button>
-          <span>&bull;</span>
-          <button
-            id="landing-footer-terms-btn"
-            type="button"
-            onClick={() => {
-              setLegalInitialTab('terms');
-              setIsLegalOpen(true);
+            className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-secondary)'
             }}
-            className="hover:underline cursor-pointer font-medium transition"
-            style={{ color: 'var(--text-secondary)' }}
+            title="Read Privacy Policy and Terms of Service"
           >
-            Terms of Service
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Terms & Privacy</span>
           </button>
         </div>
         <div className="text-[11px] opacity-80">

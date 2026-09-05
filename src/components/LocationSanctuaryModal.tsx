@@ -80,12 +80,13 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isUserTyping, setIsUserTyping] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeFetchRef = useRef<number>(0);
 
-  // Debounced search fetching matching locations with real coordinates
+  // Debounced search: ONLY fetch and show suggestions when the user actively types in the field
   useEffect(() => {
-    if (!value || value.trim().length < 2) {
+    if (!isUserTyping || !value || value.trim().length < 2) {
       setSuggestions([]);
       setIsOpen(false);
       setIsLoading(false);
@@ -116,13 +117,14 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
     return () => {
       clearTimeout(timer);
     };
-  }, [value]);
+  }, [value, isUserTyping]);
 
   // Click outside to dismiss dropdown
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setIsUserTyping(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -130,9 +132,11 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
   }, []);
 
   const handleSelect = (item: PlaceSuggestion) => {
+    setIsUserTyping(false);
     onChange(item.name);
     onPlaceSelected(item.name, item.latitude, item.longitude);
     setIsOpen(false);
+    setSuggestions([]);
     setSelectedIndex(-1);
   };
 
@@ -165,6 +169,7 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
           type="text"
           value={value}
           onChange={(e) => {
+            setIsUserTyping(true);
             onChange(e.target.value);
             if (!isOpen && e.target.value.trim().length >= 2) {
               setIsOpen(true);
@@ -398,6 +403,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
   interactionsWithLocation = []
 }) => {
   const [placeName, setPlaceName] = useState(existingLocation?.placeName || '');
+  const [selectedPresetName, setSelectedPresetName] = useState<string | null>(null);
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number }>(
     existingLocation
       ? { lat: existingLocation.latitude, lng: existingLocation.longitude }
@@ -414,6 +420,13 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
       if (existingLocation) {
         setPlaceName(existingLocation.placeName);
         setCurrentPos({ lat: existingLocation.latitude, lng: existingLocation.longitude });
+        const matched = SANCTUARY_PRESETS.find(
+          (p) => p.name.includes(existingLocation.placeName) || existingLocation.placeName.includes(p.name.split(',')[0])
+        );
+        setSelectedPresetName(matched ? matched.name : null);
+      } else {
+        setPlaceName('');
+        setSelectedPresetName(null);
       }
       setSelectedPin(null);
       setLocationSuccess(false);
@@ -466,6 +479,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
         const { latitude, longitude } = pos.coords;
         setCurrentPos({ lat: latitude, lng: longitude });
         setPlaceName(`Peaceful Spot (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`);
+        setSelectedPresetName(null);
         setIsLocating(false);
       },
       (err) => {
@@ -477,10 +491,15 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
   };
 
   const handleApplyLocation = () => {
+    const finalPlaceName =
+      placeName.trim() ||
+      (selectedPresetName ? selectedPresetName.split(',')[0] : '') ||
+      'Peaceful Spot';
+
     const loc: SanctuaryLocation = {
       latitude: currentPos.lat,
       longitude: currentPos.lng,
-      placeName: placeName.trim() || 'Peaceful Spot'
+      placeName: finalPlaceName
     };
     onLocationTagged(loc);
     setLocationSuccess(true);
@@ -597,9 +616,15 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
           </label>
           <PlaceAutocompleteInput
             value={placeName}
-            onChange={(val) => setPlaceName(val)}
+            onChange={(val) => {
+              setPlaceName(val);
+              if (val.trim().length > 0) {
+                setSelectedPresetName(null);
+              }
+            }}
             onPlaceSelected={(name, lat, lng) => {
               setPlaceName(name);
+              setSelectedPresetName(null);
               setCurrentPos({ lat, lng });
             }}
           />
@@ -629,31 +654,34 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
           Or Choose a Peaceful Destination Preset
         </span>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {SANCTUARY_PRESETS.map((preset) => (
-            <button
-              key={preset.name}
-              type="button"
-              onClick={() => {
-                setCurrentPos({ lat: preset.latitude, lng: preset.longitude });
-                setPlaceName(preset.name.split(',')[0]);
-              }}
-              className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
-                placeName === preset.name.split(',')[0] ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: placeName === preset.name.split(',')[0] ? 'var(--accent-light)' : 'var(--bg-card-elevated)',
-                borderColor: placeName === preset.name.split(',')[0] ? 'var(--accent)' : 'var(--border-color)',
-                color: placeName === preset.name.split(',')[0] ? 'var(--accent)' : 'var(--text-primary)'
-              }}
-            >
-              <p className="text-xs font-semibold truncate">
-                {preset.name.split(',')[0]}
-              </p>
-              <p className="text-[10px] line-clamp-1" style={{ color: 'var(--text-muted)' }}>
-                {preset.description}
-              </p>
-            </button>
-          ))}
+          {SANCTUARY_PRESETS.map((preset) => {
+            const isPresetActive = selectedPresetName === preset.name;
+            return (
+              <button
+                key={preset.name}
+                type="button"
+                onClick={() => {
+                  setCurrentPos({ lat: preset.latitude, lng: preset.longitude });
+                  setSelectedPresetName(preset.name);
+                }}
+                className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                  isPresetActive ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
+                }`}
+                style={{
+                  backgroundColor: isPresetActive ? 'var(--accent-light)' : 'var(--bg-card-elevated)',
+                  borderColor: isPresetActive ? 'var(--accent)' : 'var(--border-color)',
+                  color: isPresetActive ? 'var(--accent)' : 'var(--text-primary)'
+                }}
+              >
+                <p className="text-xs font-semibold truncate">
+                  {preset.name.split(',')[0]}
+                </p>
+                <p className="text-[10px] line-clamp-1" style={{ color: 'var(--text-muted)' }}>
+                  {preset.description}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
