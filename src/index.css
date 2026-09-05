@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+:root, [data-theme="midnight"] {
+  --bg-canvas: #050507;
+  --bg-card: #08080a;
+  --bg-card-elevated: #0d0d12;
+  --bg-input: #0c0c0f;
+  --border-color: rgba(51, 65, 85, 0.5);
+  --border-color-hover: rgba(99, 102, 241, 0.45);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-rgb: 99, 102, 241;
+  --accent-light: rgba(99, 102, 241, 0.12);
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --scrollbar-thumb: #1e293b;
+}
+
+[data-theme="candlelight"] {
+  --bg-canvas: #0c0a07;
+  --bg-card: #13100b;
+  --bg-card-elevated: #1a1610;
+  --bg-input: #17130e;
+  --border-color: rgba(140, 105, 55, 0.35);
+  --border-color-hover: rgba(245, 158, 11, 0.5);
+  --text-primary: #fef3c7;
+  --text-secondary: #d4a373;
+  --text-muted: #8c6f4f;
+  --accent: #f59e0b;
+  --accent-hover: #d97706;
+  --accent-rgb: 245, 158, 11;
+  --accent-light: rgba(245, 158, 11, 0.12);
+  --accent-glow: rgba(245, 158, 11, 0.35);
+  --scrollbar-thumb: #2d2315;
+}
+
+[data-theme="sage"] {
+  --bg-canvas: #060b08;
+  --bg-card: #0a120d;
+  --bg-card-elevated: #101c15;
+  --bg-input: #0d1711;
+  --border-color: rgba(40, 80, 55, 0.4);
+  --border-color-hover: rgba(16, 185, 129, 0.5);
+  --text-primary: #ecfdf5;
+  --text-secondary: #a7f3d0;
+  --text-muted: #52796f;
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --accent-rgb: 16, 185, 129;
+  --accent-light: rgba(16, 185, 129, 0.12);
+  --accent-glow: rgba(16, 185, 129, 0.35);
+  --scrollbar-thumb: #132a1f;
+}
+
+[data-theme="nordic"] {
+  --bg-canvas: #060b13;
+  --bg-card: #0a111e;
+  --bg-card-elevated: #0f1a2e;
+  --bg-input: #0d1726;
+  --border-color: rgba(30, 70, 110, 0.45);
+  --border-color-hover: rgba(6, 182, 212, 0.5);
+  --text-primary: #f0f9ff;
+  --text-secondary: #93c5fd;
+  --text-muted: #64748b;
+  --accent: #06b6d4;
+  --accent-hover: #0891b2;
+  --accent-rgb: 6, 182, 212;
+  --accent-light: rgba(6, 182, 212, 0.12);
+  --accent-glow: rgba(6, 182, 212, 0.35);
+  --scrollbar-thumb: #14243b;
+}
+
+[data-theme="warm-paper"] {
+  --bg-canvas: #f6f3ea;
+  --bg-card: #ffffff;
+  --bg-card-elevated: #fcfbf8;
+  --bg-input: #fbf9f4;
+  --border-color: rgba(180, 160, 130, 0.45);
+  --border-color-hover: rgba(180, 83, 9, 0.45);
+  --text-primary: #2d241e;
+  --text-secondary: #5c4d43;
+  --text-muted: #8d7b68;
+  --accent: #b45309;
+  --accent-hover: #92400e;
+  --accent-rgb: 180, 83, 9;
+  --accent-light: rgba(180, 83, 9, 0.08);
+  --accent-glow: rgba(180, 83, 9, 0.25);
+  --scrollbar-thumb: #d5cbbe;
+}
+
+[data-theme="solar"] {
+  --bg-canvas: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-elevated: #f1f5f9;
+  --bg-input: #f8fafc;
+  --border-color: rgba(203, 213, 225, 0.85);
+  --border-color-hover: rgba(99, 102, 241, 0.5);
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-rgb: 79, 70, 229;
+  --accent-light: rgba(79, 70, 229, 0.08);
+  --accent-glow: rgba(79, 70, 229, 0.25);
+  --scrollbar-thumb: #cbd5e1;
+}
+
+[data-theme="daylight-sage"] {
+  --bg-canvas: #f3f7f4;
+  --bg-card: #ffffff;
+  --bg-card-elevated: #f8faf9;
+  --bg-input: #f4f8f5;
+  --border-color: rgba(160, 190, 170, 0.5);
+  --border-color-hover: rgba(16, 185, 129, 0.5);
+  --text-primary: #132a1f;
+  --text-secondary: #2d4d3d;
+  --text-muted: #52796f;
+  --accent: #059669;
+  --accent-hover: #047857;
+  --accent-rgb: 5, 150, 105;
+  --accent-light: rgba(5, 150, 105, 0.08);
+  --accent-glow: rgba(5, 150, 105, 0.25);
+  --scrollbar-thumb: #c8ded0;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb, #1e293b);
+    border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    filter: brightness(1.2);
+  }
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
