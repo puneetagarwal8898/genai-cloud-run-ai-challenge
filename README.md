@@ -80,27 +80,42 @@ The sanctuary incorporates specialized, purpose-built mindfulness and introspect
    - Categorizes thoughts into 6 emotional mood orbits: *Calm, Clarity, Gratitude, Courage, Growth, and Reflective*.
    - Dynamic resonance links connect emotionally aligned thoughts across time with interactive mood distributions and node inspection drawers.
 
-2. **Sanctuary Voice Mode (Speech-to-Text & Contemplative Audio)**:
+2. **Sanctuary Voice Mode (4 Distinct Calming Voices & 432Hz Ambient Drone)**:
    - Built-in browser speech recognition transcribing reflections directly into the reflection composer with live status indicators.
-   - Auto-dismissing error notifications with manual close controls to keep the UI clean.
-   - Contemplative text-to-speech narration paired with an ambient 432Hz sine-wave healing drone and animated audio wave visualizer.
+   - Overhauled with **4 distinct, soothing, and relaxing voice profiles** crafted specifically for contemplation and mindfulness:
+     - 🌸 **Maya** (Gentle & Introspective — Soft, empathetic American cadence)
+     - 🌲 **David** (Grounding & Centered — Deep, comforting British cadence)
+     - 🌊 **Claire** (Airy & Peaceful — Serene, tranquil Australian cadence)
+     - 🌾 **Julian** (Warm & Composed — Steady, reassuring Canadian cadence)
+   - Contemplative text-to-speech narration paired with an ambient 432Hz sine-wave healing drone, live audio wave visualizer, and instant voice preview sample clips in Settings.
 
-3. **Serenity Time Capsule**:
+3. **Password-Secured PDF Archive & Download History Tracking**:
+   - Download an archival PDF containing all reflections, tags, emotional orbits, and conversational follow-ups.
+   - **Document-Level Password Encryption**: Users set an encryption password upon export; files are secured with 128-bit native PDF encryption so only the user can open them.
+   - **Privacy-Preserving Formatting**: Omits internal security labels to avoid disclosing security architectures.
+   - **Two-Factor Authorization**: Exporting requires confirming the account password and verifying with a 6-digit authenticator code when 2FA is active.
+   - **Download History & Password Reveal**: Expandable record list in Settings showing file name, date downloaded, reflection count, and an eye-mask button to view the file password at any time. Stored securely under the user's isolated Firestore `exports` collection.
+
+4. **Two-Factor Authentication (TOTP) with Step-Up Reconfiguration Verification**:
+   - Integrates RFC 6238 TOTP compatible with Google Authenticator, 1Password, Authy, and Microsoft Authenticator.
+   - **Reconfiguration & Removal Guard**: To reconfigure the QR code or disable 2FA, the user MUST enter their active 6-digit authenticator code first. Prevents session hijackers from altering MFA settings.
+
+5. **Serenity Time Capsule**:
    - Vault mechanism allowing users to seal thoughts for future reflection over designated time horizons: 7 days, 30 days, 90 days, or 365 days.
    - Unsealing protocol powered by Gemini 3.6 Flash that synthesizes personal growth, celebrating emergent strengths and emotional milestones.
 
-4. **Location-Aware Sanctuary Journey**:
+6. **Location-Aware Sanctuary Journey**:
    - Anchors reflections in physical space using Google Maps Platform (`@vis.gl/react-google-maps`).
    - Pin device GPS coordinates or pick curated meditative sanctuaries (Kyoto Bamboo Grove, Big Sur Coastline, Lake Louise).
    - Filter and explore reflections geographically on an interactive map.
 
-5. **Account Settings & Complete Data Sovereignty**:
-   - Customize display name and mindful avatar.
-   - Adjust voice synthesis parameters (pitch, speed rate, ambient background audio).
-   - Immutable email display to preserve identity integrity.
-   - Full GDPR-compliant account deletion workflow with complete Firestore interaction wipes and client-side credential clearing.
+7. **Account Settings, Theme Engine & Data Sovereignty**:
+   - 7 handcrafted color schemes (Midnight Violet, Nordic Slate, Candlelight Amber, Sage Calm, Warm Paper, Solar Daylight, Daylight Sage) with an elevated z-index dropdown that never clips behind content.
+   - Customize display name, mindful avatar, speech rate, pitch, and default voice profile.
+   - "About Sanctuary", "Privacy Policy", and "Terms of Service" accessible directly from the home screen for non-logged-in visitors as well as logged-in members.
+   - Full GDPR-compliant account deletion workflow with complete Firestore interaction and export log wipes.
 
-6. **Canvas Cursor Wave Effect**:
+8. **Canvas Cursor Wave Effect**:
    - Interactive background mathematical fluid ripple tracking cursor and touch movements without layout shifts or horizontal overflow.
 
 ---
@@ -504,6 +519,12 @@ The following step-by-step test matrix verifies every critical user interaction 
 | **11. Account Settings & Profile Update** | Click the Settings icon in the header next to the avatar. Update display name, pick an avatar, adjust voice sliders, and save. | Profile changes reflect across the dashboard immediately and persist to user profile storage. Email address is permanently locked and uneditable. |
 | **12. Account Deletion & Firestore Data Wipe** | In Settings &rarr; **Delete Account**, type `DELETE` and click **Permanently Delete My Sanctuary**. | All user interactions, time capsules, and profile documents are wiped clean from Cloud Firestore, and the session is signed out safely with a locked screen blocker during processing. |
 | **13. Secret Key Isolation** | Inspect browser network requests to `/api/config` or client source. | The `GEMINI_API_KEY` is completely absent from browser bundles; all generative AI calls proxy securely through server-side `/api/gemini/*` endpoints. |
+| **14. 4 Distinct Calming Voice Profiles** | Open Settings &rarr; Preferences &rarr; Contemplative Voice. Click **Sample** on Maya, David, Claire, and Julian. | Each voice plays a soothing, tranquil mindfulness quote with its authentic accent (American, British, Australian, Canadian) and distinct pitch/rate. Selecting a voice sets it as default for all reflection narrations. |
+| **15. Password-Secured PDF Archive Export** | Open Settings &rarr; Security &rarr; Download PDF Archive. Enter document encryption password, account password, and 2FA code (if enabled), then click **Generate & Encrypt PDF**. | Encrypted PDF downloads locally with 128-bit AES encryption. Opening the PDF prompts the reader for the document password; without it, the document cannot be rendered. Internal security flags are omitted from document headers. |
+| **16. Export Download History & Password Masking** | Open Settings &rarr; Security &rarr; expand **Download History**, or view it in the export dialog. | Displays past download events with timestamp, file name, reflection count, and masked password (`••••••••`). Clicking the eye-mask toggle unmasks the password for copy/retrieval. |
+| **17. 2FA Step-Up Reconfiguration & Removal Guard** | Enable 2FA. Then in Settings &rarr; Security, click **Reconfigure QR Code** or **Disable 2FA**. | A step-up challenge dialog opens prompting for the current 6-digit authenticator code. Entering an invalid code rejects the action. Only entering a valid 6-digit TOTP token permits reconfiguring the QR secret or disabling 2FA. |
+| **18. Public About & Legal Modals from Home Screen** | Sign out. On the landing page, click **About** or **Terms & Privacy** in either the header or the footer. | The About Sanctuary dialog (with FAQs) or the Legal Notice dialog (with Privacy Policy & Terms tabs) opens smoothly for non-logged-in visitors. Modal can be dismissed or navigated without requiring an account. |
+| **19. Theme Selector Stacking & Elevated Dropdown** | On Dashboard or Landing Page, click the palette icon to open theme options. | Dropdown displays above all nearby cards, headings, and input areas without clipping behind any underlying elements. |
 
 ---
 

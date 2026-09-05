@@ -13,13 +13,17 @@ import {
   AlertCircle,
   FlaskConical,
   CheckCircle,
-  UserPlus
+  UserPlus,
+  HelpCircle,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { ThemeSelector } from './ThemeSelector';
 import { OAuthGuideModal } from './OAuthGuideModal';
 import { InfoTooltip } from './InfoTooltip';
+import { AboutModal } from './AboutModal';
+import { LegalModal } from './LegalModal';
 
 export const LandingPage: React.FC = () => {
   const {
@@ -55,6 +59,11 @@ export const LandingPage: React.FC = () => {
   // OAuth helper modal state
   const [guideProvider, setGuideProvider] = useState<'google' | 'linkedin' | 'twitter' | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  // About and Legal modal states for non-logged in users
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [legalInitialTab, setLegalInitialTab] = useState<'privacy' | 'terms'>('privacy');
 
   const handleSwitchAuthMode = (newMode: 'social' | 'email_signin' | 'email_signup') => {
     setAuthMode(newMode);
@@ -252,6 +261,43 @@ export const LandingPage: React.FC = () => {
             )}
 
             <ThemeSelector />
+
+            {/* About Sanctuary Button for non-logged in visitors */}
+            <button
+              id="landing-header-about-btn"
+              type="button"
+              onClick={() => setIsAboutOpen(true)}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--bg-input)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-secondary)'
+              }}
+              title="Learn more about ReflectAI Sanctuary"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden sm:inline">About</span>
+            </button>
+
+            {/* Terms & Privacy Button for non-logged in visitors */}
+            <button
+              id="landing-header-legal-btn"
+              type="button"
+              onClick={() => {
+                setLegalInitialTab('privacy');
+                setIsLegalOpen(true);
+              }}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--bg-input)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-secondary)'
+              }}
+              title="Read Privacy Policy and Terms of Service"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="hidden sm:inline">Terms & Privacy</span>
+            </button>
 
             {/* Test Sandbox button only visible in Test Environment */}
             {isTestActive && (
@@ -977,15 +1023,77 @@ export const LandingPage: React.FC = () => {
 
       {/* Footer */}
       <footer
-        className="border-t py-4 px-6 text-center text-xs transition-colors"
+        className="border-t py-4 px-6 text-center text-xs transition-colors space-y-2"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderColor: 'var(--border-color)',
           color: 'var(--text-muted)'
         }}
       >
-        ReflectAI &bull; Protected by 256-Bit SSL/TLS Encryption &bull; Zero-Knowledge Journal Vault
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs">
+          <button
+            id="landing-footer-about-btn"
+            type="button"
+            onClick={() => setIsAboutOpen(true)}
+            className="hover:underline cursor-pointer font-medium transition"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            About Sanctuary
+          </button>
+          <span>&bull;</span>
+          <button
+            id="landing-footer-privacy-btn"
+            type="button"
+            onClick={() => {
+              setLegalInitialTab('privacy');
+              setIsLegalOpen(true);
+            }}
+            className="hover:underline cursor-pointer font-medium transition"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Privacy Policy
+          </button>
+          <span>&bull;</span>
+          <button
+            id="landing-footer-terms-btn"
+            type="button"
+            onClick={() => {
+              setLegalInitialTab('terms');
+              setIsLegalOpen(true);
+            }}
+            className="hover:underline cursor-pointer font-medium transition"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Terms of Service
+          </button>
+        </div>
+        <div className="text-[11px] opacity-80">
+          ReflectAI &bull; Protected by 256-Bit SSL/TLS Encryption &bull; Zero-Knowledge Journal Vault
+        </div>
       </footer>
+
+      {/* About Sanctuary Modal */}
+      <AboutModal
+        isOpen={isAboutOpen}
+        onClose={() => setIsAboutOpen(false)}
+        onOpenPrivacy={() => {
+          setIsAboutOpen(false);
+          setLegalInitialTab('privacy');
+          setIsLegalOpen(true);
+        }}
+        onOpenTerms={() => {
+          setIsAboutOpen(false);
+          setLegalInitialTab('terms');
+          setIsLegalOpen(true);
+        }}
+      />
+
+      {/* Legal, Privacy & Terms Modal */}
+      <LegalModal
+        isOpen={isLegalOpen}
+        initialTab={legalInitialTab}
+        onClose={() => setIsLegalOpen(false)}
+      />
 
       {/* OAuth Credentials Configuration & Help Modal */}
       <OAuthGuideModal

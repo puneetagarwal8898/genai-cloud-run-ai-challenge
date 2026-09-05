@@ -60,9 +60,9 @@ const FAQ_ITEMS: FAQItem[] = [
       'When listening to audio narrations of your reflections, a soft, subtle background tone tuned to 432Hz gently plays. Many people find this gentle frequency helps relax the mind, slow down racing thoughts, and reduce screen fatigue.'
   },
   {
-    question: 'Can I download or back up my journals?',
+    question: 'Can I download or back up my reflections?',
     answer:
-      'Yes! Use the Export button at the top of your journal to download your entire reflection history as a tidy text document onto your computer or phone.'
+      'Yes! You can download your entire reflection archive as an encrypted PDF. Click on the Settings (gear icon) in the top-right header, select the "Security & Privacy" tab, and click "Download PDF Archive". You will be prompted to set a document password to encrypt your file, ensuring only you can open and read your downloaded reflections. You can also review your past export history and reveal file passwords at any time.'
   }
 ];
 

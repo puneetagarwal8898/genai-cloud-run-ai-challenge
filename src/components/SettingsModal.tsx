@@ -23,6 +23,8 @@ import {
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { CURATED_VOICES, resolveSpeechVoice, previewVoice, VoiceProfile } from '../utils/voiceUtils';
+import { verifyTotpToken } from '../utils/totp';
+import { ExportDownloadHistory } from './ExportDownloadHistory';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -83,6 +85,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // 2FA state
   const [isDisabling2FA, setIsDisabling2FA] = useState(false);
   const [twoFactorNotice, setTwoFactorNotice] = useState<string | null>(null);
+  const [twoFactorChallengeAction, setTwoFactorChallengeAction] = useState<'reconfigure' | 'disable' | null>(null);
+  const [challengeTotpCode, setChallengeTotpCode] = useState('');
+  const [challengeError, setChallengeError] = useState<string | null>(null);
 
   // Delete flow
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -143,10 +148,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
     setPreviewingVoiceId(voiceProfile.id);
-    const resolved = resolveSpeechVoice(voiceProfile.keywords[0], voiceProfile.gender);
-    previewVoice(resolved, voiceRate, voicePitch, () => {
-      setPreviewingVoiceId(null);
-    });
+    const resolved = resolveSpeechVoice(voiceProfile.id, voiceProfile.gender);
+    previewVoice(
+      resolved,
+      voiceRate || voiceProfile.defaultRate,
+      voicePitch || voiceProfile.defaultPitch,
+      () => {
+        setPreviewingVoiceId(null);
+      },
+      voiceProfile.sampleText
+    );
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -208,19 +219,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleDisable2FA = async () => {
-    if (!window.confirm('Are you sure you want to disable two-factor authentication? This will remove 2FA protection from your reflections.')) {
+  const handleInitiate2FAAction = (action: 'reconfigure' | 'disable') => {
+    if (userProfile?.twoFactorEnabled && userProfile?.twoFactorSecret) {
+      setTwoFactorChallengeAction(action);
+      setChallengeTotpCode('');
+      setChallengeError(null);
+    } else {
+      if (action === 'reconfigure') {
+        onClose();
+        onOpenTwoFactorSetup?.();
+      }
+    }
+  };
+
+  const handleConfirm2FAChallenge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChallengeError(null);
+    const cleanCode = challengeTotpCode.replace(/\s+/g, '').trim();
+    if (cleanCode.length !== 6) {
+      setChallengeError('Please enter the 6-digit code from your authenticator app.');
       return;
     }
-    setIsDisabling2FA(true);
-    setTwoFactorNotice(null);
-    try {
-      await disableTwoFactorAuth();
-      setTwoFactorNotice('Two-factor authentication has been successfully disabled.');
-    } catch (err: any) {
-      setTwoFactorNotice(err?.message || 'Failed to disable two-factor authentication.');
-    } finally {
-      setIsDisabling2FA(false);
+    if (!userProfile?.twoFactorSecret) {
+      setChallengeError('No 2FA secret found on this account.');
+      return;
+    }
+    const isValid = verifyTotpToken(userProfile.twoFactorSecret, cleanCode);
+    if (!isValid) {
+      setChallengeError('Invalid 2FA authenticator code. Please check your authenticator app and try again.');
+      return;
+    }
+
+    const action = twoFactorChallengeAction;
+    setTwoFactorChallengeAction(null);
+    setChallengeTotpCode('');
+
+    if (action === 'reconfigure') {
+      onClose();
+      onOpenTwoFactorSetup?.();
+    } else if (action === 'disable') {
+      setIsDisabling2FA(true);
+      setTwoFactorNotice(null);
+      try {
+        await disableTwoFactorAuth();
+        setTwoFactorNotice('Two-factor authentication has been verified and disabled successfully.');
+      } catch (err: any) {
+        setTwoFactorNotice(err?.message || 'Failed to disable two-factor authentication.');
+      } finally {
+        setIsDisabling2FA(false);
+      }
     }
   };
 
@@ -659,8 +706,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div
                         key={voice.id}
                         id={`voice-option-${voice.id}`}
-                        onClick={() => setSelectedVoiceId(voice.id)}
-                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between gap-2.5 ${
+                        onClick={() => {
+                          setSelectedVoiceId(voice.id);
+                          setVoiceRate(voice.defaultRate);
+                          setVoicePitch(voice.defaultPitch);
+                        }}
+                        className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between gap-2.5 ${
                           isSelected ? 'ring-2' : 'hover:opacity-90'
                         }`}
                         style={{
@@ -671,12 +722,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                                 {voice.name}
                               </p>
                               <span
-                                className="text-[10px] px-1.5 py-0.2 rounded-full font-medium capitalize"
+                                className="text-[9px] px-1.5 py-0.5 rounded-full font-medium capitalize"
                                 style={{
                                   backgroundColor: 'var(--bg-card)',
                                   color: 'var(--text-muted)',
@@ -684,6 +735,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 }}
                               >
                                 {voice.gender}
+                              </span>
+                              <span
+                                className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                                style={{
+                                  backgroundColor: 'var(--accent-light)',
+                                  color: 'var(--accent)',
+                                  border: '1px solid var(--accent)'
+                                }}
+                              >
+                                {voice.accent}
                               </span>
                             </div>
                             <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--accent)' }}>
@@ -704,7 +765,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               borderColor: 'var(--border-color)',
                               color: isPlaying ? 'var(--accent)' : 'var(--text-primary)'
                             }}
-                            title={isPlaying ? 'Stop voice sample' : 'Listen to voice sample'}
+                            title={isPlaying ? 'Stop voice sample' : 'Listen to calming voice sample'}
                           >
                             {isPlaying ? (
                               <>
@@ -720,8 +781,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </button>
                         </div>
 
-                        <p className="text-[11px] leading-relaxed line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                        <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                           {voice.description}
+                        </p>
+
+                        <p className="text-[11px] leading-relaxed italic border-l-2 pl-2" style={{ borderColor: 'var(--accent)', color: 'var(--text-muted)' }}>
+                          "{voice.sampleText}"
                         </p>
                       </div>
                     );
@@ -843,10 +908,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="button"
                         id="reconfigure-2fa-btn"
-                        onClick={() => {
-                          onClose();
-                          onOpenTwoFactorSetup?.();
-                        }}
+                        onClick={() => handleInitiate2FAAction('reconfigure')}
                         className="px-3.5 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-85 flex items-center gap-1.5"
                         style={{
                           backgroundColor: 'var(--bg-card)',
@@ -862,7 +924,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="button"
                         id="disable-2fa-btn"
                         disabled={isDisabling2FA}
-                        onClick={handleDisable2FA}
+                        onClick={() => handleInitiate2FAAction('disable')}
                         className="px-3 py-1.5 rounded-lg border text-xs font-medium text-red-400 hover:bg-red-500/10 transition cursor-pointer disabled:opacity-50"
                         style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}
                       >
@@ -888,6 +950,82 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   )}
                 </div>
+
+                {/* 2FA Reconfigure / Disable Step-Up Challenge Dialog */}
+                {twoFactorChallengeAction && (
+                  <div
+                    id="challenge-2fa-dialog"
+                    className="p-3.5 rounded-xl border space-y-2.5 mt-3 animate-in fade-in"
+                    style={{
+                      backgroundColor: 'rgba(217, 119, 6, 0.08)',
+                      borderColor: 'rgba(217, 119, 6, 0.3)'
+                    }}
+                  >
+                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      <Key className="w-4 h-4" />
+                      <span>
+                        Security Verification Required to {twoFactorChallengeAction === 'reconfigure' ? 'Reconfigure' : 'Disable'} 2FA
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      To confirm your identity, please enter the current 6-digit code from your authenticator app before {twoFactorChallengeAction === 'reconfigure' ? 'reconfiguring your QR code' : 'removing 2FA protection'}:
+                    </p>
+                    <form onSubmit={handleConfirm2FAChallenge} className="space-y-2.5">
+                      <input
+                        id="challenge-totp-input"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        placeholder="000000"
+                        autoFocus
+                        value={challengeTotpCode}
+                        onChange={(e) => {
+                          setChallengeTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                          if (challengeError) setChallengeError(null);
+                        }}
+                        className="w-full text-center text-lg font-mono font-bold tracking-[0.25em] py-2 px-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                      {challengeError && (
+                        <p className="text-xs text-red-500 font-medium">{challengeError}</p>
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTwoFactorChallengeAction(null);
+                            setChallengeTotpCode('');
+                            setChallengeError(null);
+                          }}
+                          className="px-3 py-1 text-xs rounded-lg border cursor-pointer hover:opacity-85"
+                          style={{
+                            backgroundColor: 'var(--bg-card)',
+                            borderColor: 'var(--border-color)',
+                            color: 'var(--text-secondary)'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={challengeTotpCode.length !== 6 || isDisabling2FA}
+                          className="px-3.5 py-1 text-xs font-semibold rounded-lg text-white cursor-pointer disabled:opacity-50"
+                          style={{
+                            backgroundColor: 'var(--accent)',
+                            boxShadow: '0 0 10px var(--accent-glow)'
+                          }}
+                        >
+                          {isDisabling2FA ? 'Verifying...' : 'Verify & Continue'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </div>
 
               {/* PDF Reflection Export Section */}
@@ -930,6 +1068,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Download className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
                   <span>Download PDF Archive</span>
                 </button>
+
+                {/* Expandable list of file downloads with eye mask button for passwords */}
+                <ExportDownloadHistory userId={userProfile?.uid} defaultExpanded={false} />
               </div>
 
               {/* Password Reset Section */}

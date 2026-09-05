@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db, getFirebaseCredentialsStatus } from '../firebase';
 import { JournalInteraction } from '../types';
+import { wipeUserExportHistory, getCachedExportHistory } from './exportLogService';
 
 // Clean payload to eliminate undefined values
 export function sanitizePayload<T extends Record<string, any>>(obj: T): T {
@@ -265,6 +266,13 @@ export async function wipeAllUserData(userId: string, userEmail?: string): Promi
       console.warn("Cloud records wipe note:", err.message);
     }
   }
+
+  // Also purge all export download records for this user
+  try {
+    await wipeUserExportHistory(userId);
+  } catch (expWipeErr) {
+    console.warn("Export records wipe note:", expWipeErr);
+  }
 }
 
 /**
@@ -278,7 +286,7 @@ export async function archiveAndWipeUserData(
 ): Promise<{ archiveId: string }> {
   if (!userId) return { archiveId: '' };
 
-  // 1. Snapshot interactions before active storage purge
+  // 1. Snapshot interactions & exports before active storage purge
   const key = `${LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX}${userId}`;
   let interactions: JournalInteraction[] = [];
   try {
@@ -287,6 +295,8 @@ export async function archiveAndWipeUserData(
   } catch (e) {
     interactions = memoryCache.get(userId) || [];
   }
+
+  const exportRecords = getCachedExportHistory(userId);
 
   // 2. Send GDPR compliance archiving payload to backend server
   let archiveId = `gdpr-arch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -302,6 +312,7 @@ export async function archiveAndWipeUserData(
         email: userEmail,
         profile,
         interactions,
+        exportHistoryCount: exportRecords.length,
         deletionReason: 'User self-service complete account erasure under GDPR Article 17'
       })
     });
@@ -325,6 +336,7 @@ export async function archiveAndWipeUserData(
       userId,
       archivedAt: new Date().toISOString(),
       interactionsCount: interactions.length,
+      exportsCount: exportRecords.length,
       status: 'PURGED_AND_ARCHIVED'
     });
     localStorage.setItem(gdprKey, JSON.stringify(ledger));

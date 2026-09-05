@@ -53,6 +53,18 @@ export interface UserProfile {
   twoFactorEnabled?: boolean;
   twoFactorSecret?: string;
   twoFactorConfiguredAt?: string;
+  exportHistory?: ExportDownloadRecord[];
+}
+
+export interface ExportDownloadRecord {
+  id: string;
+  fileName: string;
+  filePassword?: string;
+  downloadedAt: string;
+  entriesCount: number;
+  fileSizeBytes?: number;
+  fileSizeFormatted?: string;
+  securityMethod: string;
 }
 
 export type ReflectionMode = 'reflection' | 'brainstorm' | 'summary' | 'advice';

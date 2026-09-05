@@ -1,19 +1,42 @@
 import jsPDF from 'jspdf';
 import { JournalInteraction, UserProfile } from '../types';
 
+export interface ExportPdfResult {
+  fileName: string;
+  fileSizeFormatted: string;
+  entriesCount: number;
+  downloadedAt: string;
+  filePassword?: string;
+  securityMethod: string;
+}
+
 /**
  * Generates a clean, beautifully formatted mindful PDF document of all reflections
  * and triggers a client-side download.
+ * If filePassword is provided, standard PDF encryption protects the file upon opening.
  */
 export function exportReflectionsToPdf(
   interactions: JournalInteraction[],
-  userProfile?: UserProfile | null
-): void {
-  const doc = new jsPDF({
+  userProfile?: UserProfile | null,
+  filePassword?: string
+): ExportPdfResult {
+  const cleanPassword = filePassword ? filePassword.trim() : '';
+
+  const pdfOptions: any = {
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
-  });
+  };
+
+  if (cleanPassword) {
+    pdfOptions.encryption = {
+      userPassword: cleanPassword,
+      ownerPassword: cleanPassword,
+      userPermissions: ['print']
+    };
+  }
+
+  const doc = new jsPDF(pdfOptions);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -72,8 +95,6 @@ export function exportReflectionsToPdf(
   doc.text(`Exported for: ${ownerName} (${userProfile?.email || 'Private Account'})`, margin, y);
   y += 6;
   doc.text(`Export Date: ${exportDate}  •  Total Entries: ${interactions.length}`, margin, y);
-  y += 6;
-  doc.text('Security Status: Verified via Password & Two-Factor Authentication', margin, y);
   y += 8;
 
   // Gold accent divider
@@ -89,9 +110,6 @@ export function exportReflectionsToPdf(
   } else {
     interactions.forEach((item, index) => {
       checkPageBreak(35);
-
-      // Entry Card Background / Border
-      const cardStartY = y;
 
       // Entry Title & Index
       doc.setFontSize(13);
@@ -138,7 +156,7 @@ export function exportReflectionsToPdf(
 
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(51, 65, 85);
-      const promptLines = doc.splitTextToSize(item.prompt, contentWidth);
+      const promptLines = doc.splitTextToSize(item.prompt || '', contentWidth);
       promptLines.forEach((line: string) => {
         checkPageBreak(5);
         doc.text(line, margin, y);
@@ -182,7 +200,24 @@ export function exportReflectionsToPdf(
     });
   }
 
+  // Calculate approximate file size
+  const pdfOutput = doc.output('datauristring');
+  const sizeBytes = Math.round((pdfOutput.length * 3) / 4);
+  const sizeFormatted = sizeBytes > 1024 * 1024
+    ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.round(sizeBytes / 1024)} KB`;
+
   // Save the document
   const safeDate = new Date().toISOString().slice(0, 10);
-  doc.save(`ReflectAI-Sanctuary-Reflections-${safeDate}.pdf`);
+  const fileName = `ReflectAI-Sanctuary-Reflections-${safeDate}.pdf`;
+  doc.save(fileName);
+
+  return {
+    fileName,
+    fileSizeFormatted: sizeFormatted,
+    entriesCount: interactions.length,
+    downloadedAt: new Date().toISOString(),
+    filePassword: cleanPassword || undefined,
+    securityMethod: cleanPassword ? 'Standard Encrypted (Password-Secured)' : 'Standard PDF'
+  };
 }
