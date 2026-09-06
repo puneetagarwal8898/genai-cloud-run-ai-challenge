@@ -60,6 +60,22 @@ app.get("/api/config", (req, res) => {
   const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || "";
   const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "";
 
+  // In production, do not expose sensitive API keys or credential objects in raw JSON
+  const safeFirebaseConfig = isProdLocked
+    ? {
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : ""),
+        projectId: firebaseProjectId,
+        status: "configured_in_production"
+      }
+    : {
+        apiKey: firebaseApiKey,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : ""),
+        projectId: firebaseProjectId,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : ""),
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+        appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || ""
+      };
+
   res.json({
     appEnv: process.env.APP_ENV || "test",
     isProductionLocked: isProdLocked,
@@ -67,14 +83,7 @@ app.get("/api/config", (req, res) => {
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
     hasFirebaseKey: Boolean(firebaseApiKey),
     hasFirebaseConfigured: Boolean(firebaseApiKey && firebaseProjectId),
-    firebaseConfig: {
-      apiKey: firebaseApiKey,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : ""),
-      projectId: firebaseProjectId,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : ""),
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-      appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || ""
-    },
+    firebaseConfig: safeFirebaseConfig,
     timestamp: new Date().toISOString()
   });
 });
@@ -475,30 +484,26 @@ async function startServer() {
       const indexPath = path.join(distPath, "index.html");
       const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || "";
       const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "";
+      const currentEnv = process.env.APP_ENV || "test";
+      const isProd = currentEnv === "production";
 
-      if (firebaseApiKey) {
-        fs.readFile(indexPath, "utf8", (err, html) => {
-          if (err) {
-            res.sendFile(indexPath);
-            return;
-          }
-          const clientConfig = {
-            apiKey: firebaseApiKey,
-            authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : ""),
-            projectId: firebaseProjectId,
-            storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : ""),
-            messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-            appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || ""
-          };
-          const injectedHtml = html.replace(
-            "<head>",
-            `<head><script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(clientConfig)};</script>`
-          );
-          res.send(injectedHtml);
-        });
-      } else {
-        res.sendFile(indexPath);
-      }
+      fs.readFile(indexPath, "utf8", (err, html) => {
+        if (err) {
+          res.sendFile(indexPath);
+          return;
+        }
+        const clientConfig = {
+          apiKey: firebaseApiKey,
+          authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : ""),
+          projectId: firebaseProjectId,
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || (firebaseProjectId ? `${firebaseProjectId}.appspot.com` : ""),
+          messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+          appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || ""
+        };
+        const envScript = `<script>window.__APP_ENV__ = ${JSON.stringify(currentEnv)}; window.__IS_PRODUCTION_LOCKED__ = ${isProd}; window.__FIREBASE_CONFIG__ = ${JSON.stringify(clientConfig)};</script>`;
+        const injectedHtml = html.replace("<head>", `<head>${envScript}`);
+        res.send(injectedHtml);
+      });
     });
   }
 

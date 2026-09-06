@@ -27,8 +27,25 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const LOCAL_STORAGE_ENV_KEY = 'reflectai_app_env';
 const LOCAL_STORAGE_DEVICE_KEY = 'reflectai_device_mode';
 
+// Global runtime injected flags
+declare global {
+  interface Window {
+    __APP_ENV__?: 'production' | 'test';
+    __IS_PRODUCTION_LOCKED__?: boolean;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [appEnv, setAppEnvState] = useState<AppEnvironment>(() => {
+    // 1. Synchronously inspect server injection to avoid flashing tabs
+    if (typeof window !== 'undefined') {
+      if (window.__APP_ENV__ === 'production' || window.__IS_PRODUCTION_LOCKED__ === true) {
+        return 'production';
+      }
+      if (window.__APP_ENV__ === 'test') {
+        return 'test';
+      }
+    }
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_ENV_KEY) as AppEnvironment;
       if (saved === 'production' || saved === 'test') {
@@ -40,7 +57,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return 'test';
   });
 
-  const [isProductionLocked, setIsProductionLocked] = useState<boolean>(false);
+  const [isProductionLocked, setIsProductionLocked] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return Boolean(window.__IS_PRODUCTION_LOCKED__ || window.__APP_ENV__ === 'production');
+    }
+    return false;
+  });
 
   const [deviceMode, setDeviceModeState] = useState<DeviceViewportMode>(() => {
     try {
