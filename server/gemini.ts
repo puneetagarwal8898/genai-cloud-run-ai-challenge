@@ -12,12 +12,12 @@ export const MODEL_FALLBACK_LADDER = [
 let aiClient: GoogleGenAI | null = null;
 
 export function getAiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is not configured. Please set GEMINI_API_KEY in your Cloud Run service environment variables.");
+  }
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY environment variable is not set. Using local dummy client if available.");
-    }
-    aiClient = new GoogleGenAI({ apiKey: apiKey || "" });
+    aiClient = new GoogleGenAI({ apiKey });
   }
   return aiClient;
 }

@@ -284,7 +284,22 @@ export const Dashboard: React.FC = () => {
 
     } catch (err: any) {
       console.error("Journal reflection error:", err);
-      setActionError(err.message || "Unable to reach reflection partner. Please try again.");
+      let errMsg = err.message || "Unable to reach reflection partner. Please try again.";
+      // Clean up raw Google API JSON if bubbled up
+      if (typeof errMsg === 'string' && errMsg.includes('"message":')) {
+        try {
+          const parsed = JSON.parse(errMsg);
+          if (parsed?.error?.message) {
+            errMsg = parsed.error.message;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      if (errMsg.includes("Method doesn't allow unregistered callers") || errMsg.includes("GEMINI_API_KEY")) {
+        errMsg = "Gemini API key is not configured on your Cloud Run service. Please set GEMINI_API_KEY in Cloud Run environment variables.";
+      }
+      setActionError(errMsg);
       setIsSubmitting(false);
     }
   };
