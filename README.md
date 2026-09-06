@@ -213,7 +213,7 @@ Run this single command from your project root. Google Cloud Build will automati
 gcloud run deploy reflectai \
   --source . \
   --platform managed \
-  --region europe-west2 \
+  --region asia-south1 \
   --allow-unauthenticated \
   --set-env-vars APP_ENV=production,NODE_ENV=production \
   --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest \
@@ -230,7 +230,7 @@ You can pass your Firebase project keys directly via Cloud Run environment varia
 
 ```bash
 gcloud run services update reflectai \
-  --region europe-west2 \
+  --region asia-south1 \
   --update-env-vars FIREBASE_API_KEY=YOUR_FIREBASE_WEB_API_KEY,FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
 ```
 
@@ -238,7 +238,46 @@ gcloud run services update reflectai \
 ```bash
 gcloud run services update reflectai \
   --update-labels=dev-tutorial=cloud-run-ai-challenge \
-  --region=europe-west2
+  --region=asia-south1
+```
+
+---
+
+## 7. Fast Re-deployment & Git Update Workflow
+
+### How Cloud Run Preserves Your Secrets & Configuration
+> **Important Concept**: In Google Cloud Run, your secrets (from Secret Manager) and environment variables are attached to the **Cloud Run Service Definition**. 
+> When you deploy new code with `gcloud run deploy reflectai --source .`, Cloud Run **automatically preserves all previously configured secrets and environment variables**. You do **not** need to re-type them!
+
+### Updating Code in Google Cloud Shell from GitHub
+When you have pushed changes to GitHub and want to update Cloud Shell:
+
+```bash
+# 1. Navigate to your cloned repository directory in Cloud Shell
+cd ~/reflectai   # (or your repo folder name)
+
+# 2. Pull latest commits from GitHub
+git pull origin main
+
+# (Optional) If you have any conflicting local edits in Cloud Shell and want to force match GitHub:
+# git fetch origin && git reset --hard origin/main
+```
+
+### One-Command Redeploy (Preserving All Secrets & Variables)
+Once code is updated in Cloud Shell, run:
+
+```bash
+# Deploy new code (Cloud Run keeps all existing env vars & secrets automatically!)
+gcloud run deploy reflectai \
+  --source . \
+  --region asia-south1 \
+  --allow-unauthenticated
+```
+
+Or make the included script executable and run it:
+```bash
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 ---
