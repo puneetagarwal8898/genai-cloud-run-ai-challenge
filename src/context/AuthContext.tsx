@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import {
   auth,
+  getActiveAuth,
   googleProvider,
   facebookProvider,
   linkedInProvider,
@@ -108,31 +109,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 2. Firebase Auth state observer
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const profile: UserProfile = {
-          uid: currentUser.uid,
-          email: currentUser.email || `${currentUser.uid}@reflectai.internal`,
-          displayName: currentUser.displayName || 'Reflective Mind',
-          photoURL: currentUser.photoURL || null,
-          authProvider: 'google',
-          emailVerified: currentUser.emailVerified,
-          createdAt: currentUser.metadata.creationTime || new Date().toISOString(),
-          lastActiveAt: new Date().toISOString()
-        };
-        setUserProfile(profile);
-      } else {
-        // Only clear if no local user active
-        if (!localStorage.getItem(LOCAL_STORAGE_USER_KEY)) {
-          setUserProfile(null);
+    let unsubscribe = () => {};
+    try {
+      const activeAuth = getActiveAuth();
+      unsubscribe = onAuthStateChanged(activeAuth, (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          const profile: UserProfile = {
+            uid: currentUser.uid,
+            email: currentUser.email || `${currentUser.uid}@reflectai.internal`,
+            displayName: currentUser.displayName || 'Reflective Mind',
+            photoURL: currentUser.photoURL || null,
+            authProvider: 'google',
+            emailVerified: currentUser.emailVerified,
+            createdAt: currentUser.metadata.creationTime || new Date().toISOString(),
+            lastActiveAt: new Date().toISOString()
+          };
+          setUserProfile(profile);
+        } else {
+          // Only clear if no local user active
+          if (!localStorage.getItem(LOCAL_STORAGE_USER_KEY)) {
+            setUserProfile(null);
+          }
         }
-      }
+        setLoading(false);
+      }, (err) => {
+        console.warn("Auth state observer warning:", err.message);
+        setLoading(false);
+      });
+    } catch (authErr) {
+      console.warn("Auth state observer initialization warning:", authErr);
       setLoading(false);
-    }, (err) => {
-      console.warn("Auth state observer warning:", err.message);
-      setLoading(false);
-    });
+    }
 
     return () => unsubscribe();
   }, []);
@@ -154,7 +162,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(`Firebase credentials missing: ${missing.join(', ')}. Configure them in your project Secrets / Environment Variables.`);
       }
 
-      const result = await signInWithPopup(auth, googleProvider);
+      const activeAuth = getActiveAuth();
+      const result = await signInWithPopup(activeAuth, googleProvider);
       const loggedUser = result.user;
       const profile: UserProfile = {
         uid: loggedUser.uid,
