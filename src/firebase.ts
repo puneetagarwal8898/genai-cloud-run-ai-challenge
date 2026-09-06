@@ -22,7 +22,26 @@ const runtimeConfig = typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__
 const firebaseApiKey = runtimeConfig?.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "";
 const firebaseProjectId = runtimeConfig?.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
 
-export const isFirebaseConfigured = Boolean(firebaseApiKey && firebaseProjectId);
+export const isFirebaseConfigured = Boolean(
+  firebaseApiKey && 
+  firebaseApiKey !== "UNCONFIGURED_FIREBASE_API_KEY" && 
+  firebaseProjectId && 
+  firebaseProjectId !== "unconfigured-project"
+);
+
+export function getFirebaseCredentialsStatus() {
+  const currentKey = (typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__?.apiKey : undefined) || import.meta.env.VITE_FIREBASE_API_KEY || "";
+  const currentProject = (typeof window !== 'undefined' ? window.__FIREBASE_CONFIG__?.projectId : undefined) || import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
+  const isValid = Boolean(currentKey && currentKey !== "UNCONFIGURED_FIREBASE_API_KEY" && currentProject && currentProject !== "unconfigured-project");
+  
+  return {
+    isConfigured: isValid,
+    hasApiKey: Boolean(currentKey && currentKey !== "UNCONFIGURED_FIREBASE_API_KEY"),
+    hasProjectId: Boolean(currentProject && currentProject !== "unconfigured-project"),
+    apiKey: currentKey,
+    projectId: currentProject
+  };
+}
 
 const firebaseConfig = {
   apiKey: firebaseApiKey || "UNCONFIGURED_FIREBASE_API_KEY",

@@ -9,7 +9,8 @@ import {
   auth,
   googleProvider,
   facebookProvider,
-  linkedInProvider
+  linkedInProvider,
+  getFirebaseCredentialsStatus
 } from '../firebase';
 import { UserProfile } from '../types';
 
@@ -145,6 +146,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async (isTestEnv = false) => {
     setError(null);
     try {
+      const creds = getFirebaseCredentialsStatus();
+      if (!creds.isConfigured && !isTestEnv) {
+        const missing: string[] = [];
+        if (!creds.hasApiKey) missing.push("FIREBASE_API_KEY");
+        if (!creds.hasProjectId) missing.push("FIREBASE_PROJECT_ID");
+        throw new Error(`Firebase credentials missing: ${missing.join(', ')}. Configure them in your project Secrets / Environment Variables.`);
+      }
+
       const result = await signInWithPopup(auth, googleProvider);
       const loggedUser = result.user;
       const profile: UserProfile = {
@@ -174,9 +183,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         saveActiveSession(fallbackProfile);
       } else {
-        const msg = err.code === 'auth/invalid-api-key' || err.code === 'auth/unauthorized-domain'
-          ? 'Google Sign-In requires your Firebase project credentials. Please configure VITE_FIREBASE_API_KEY and authorize this domain in Firebase Console.'
-          : (err.message || 'Failed to sign in with Google.');
+        let msg = err.message || 'Failed to sign in with Google.';
+        if (err.code === 'auth/invalid-api-key' || err.code === 'auth/api-key-not-valid' || err.message?.includes('api-key-not-valid')) {
+          msg = 'Firebase Web API Key is invalid or restricted. Ensure your Web API Key from Firebase Console (Project Settings > General > Web API Key) is set in FIREBASE_API_KEY and Identity Toolkit API is enabled in Google Cloud Console.';
+        } else if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+          msg = 'This domain is not authorized for OAuth sign-in. In Firebase Console, go to Authentication > Settings > Authorized Domains, and add this domain.';
+        } else if (err.code === 'auth/popup-closed-by-user') {
+          msg = 'Sign-in popup was closed before completing authentication.';
+        } else if (err.code === 'auth/operation-not-allowed') {
+          msg = 'Google Sign-In provider is disabled in Firebase. In Firebase Console, go to Authentication > Sign-in method and enable Google.';
+        }
         setError(msg);
         throw new Error(msg);
       }
