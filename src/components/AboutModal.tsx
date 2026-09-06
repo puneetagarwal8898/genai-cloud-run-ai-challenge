@@ -9,15 +9,16 @@ import {
   MapPin,
   ChevronDown,
   ChevronUp,
-  ShieldCheck,
   HelpCircle,
-  Feather,
-  ArrowLeft
+  Feather
 } from 'lucide-react';
+
+export type AboutModalTab = 'about' | 'faq';
 
 interface AboutModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: AboutModalTab;
   onOpenPrivacy?: () => void;
   onOpenTerms?: () => void;
   onBack?: () => void;
@@ -69,21 +70,39 @@ const FAQ_ITEMS: FAQItem[] = [
 export const AboutModal: React.FC<AboutModalProps> = ({
   isOpen,
   onClose,
+  initialTab = 'about',
   onOpenPrivacy,
   onOpenTerms,
   onBack
 }) => {
+  const [activeTab, setActiveTab] = useState<AboutModalTab>(initialTab);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  // Sync activeTab whenever initialTab changes or modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab || 'about');
+    }
+  }, [isOpen, initialTab]);
 
   const toggleFaq = (index: number) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
+  };
+
+  // Unified dismiss handler: if onBack is provided (e.g. from Settings), return to Settings; otherwise close
+  const handleDismiss = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      onClose();
+    }
   };
 
   // Handle Escape key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        onClose();
+        handleDismiss();
       }
     };
     if (isOpen) {
@@ -92,7 +111,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onBack, onClose]);
 
   if (!isOpen) return null;
 
@@ -103,7 +122,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
       id="about-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          onClose();
+          handleDismiss();
         }
       }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
@@ -126,9 +145,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             borderColor: 'var(--border-color)'
           }}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
               style={{
                 backgroundColor: 'var(--accent-light)',
                 color: 'var(--accent)'
@@ -136,213 +155,227 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             >
               <Feather className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-semibold tracking-tight">
-                About ReflectAI
-              </h2>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Your calm, personal sanctuary for everyday reflection
-              </p>
+
+            {/* Direct Tab Switcher in Header */}
+            <div className="flex rounded-lg p-0.5 border" style={{ borderColor: 'var(--border-color)' }}>
+              <button
+                type="button"
+                id="about-tab-btn-overview"
+                onClick={() => setActiveTab('about')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'about' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
+                }`}
+                style={{
+                  backgroundColor: activeTab === 'about' ? 'var(--accent)' : 'transparent',
+                  color: activeTab === 'about' ? '#ffffff' : 'var(--text-secondary)'
+                }}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>About Sanctuary</span>
+              </button>
+
+              <button
+                type="button"
+                id="about-tab-btn-faq"
+                onClick={() => setActiveTab('faq')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'faq' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
+                }`}
+                style={{
+                  backgroundColor: activeTab === 'faq' ? 'var(--accent)' : 'transparent',
+                  color: activeTab === 'faq' ? '#ffffff' : 'var(--text-secondary)'
+                }}
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>FAQ</span>
+              </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {onBack ? (
-              <button
-                id="about-modal-back-btn"
-                type="button"
-                onClick={onBack}
-                aria-label="Back to Settings"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
-              </button>
-            ) : (
-              <button
-                onClick={onClose}
-                aria-label="Close About window"
-                className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              id="about-modal-close-btn"
+              onClick={handleDismiss}
+              aria-label="Close About window"
+              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
         {/* Scrollable Content */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar text-sm leading-relaxed">
-          {/* Mission & Purpose */}
-          <div
-            className="p-4 rounded-xl border"
-            style={{
-              backgroundColor: 'var(--bg-card-elevated)',
-              borderColor: 'var(--border-color)'
-            }}
-          >
-            <h3
-              className="text-sm font-semibold flex items-center gap-2 mb-2"
-              style={{ color: 'var(--accent)' }}
-            >
-              <Sparkles className="w-4 h-4 shrink-0" />
-              What is ReflectAI?
-            </h3>
-            <p style={{ color: 'var(--text-secondary)' }} className="text-xs sm:text-sm">
-              ReflectAI is designed to give you a quiet, uncluttered breath in a noisy world.
-              It is your private space to untangle your thoughts, celebrate small daily wins,
-              and gain calm perspective without judgment or pressure.
-            </p>
-          </div>
-
-          {/* Simple Explanation: Journal vs. Sanctuary */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-              <Compass className="w-3.5 h-3.5" />
-              Understanding Sanctuary & Journal
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {activeTab === 'about' ? (
+            <>
+              {/* Mission & Purpose */}
               <div
-                className="p-3.5 rounded-xl border"
+                className="p-4 rounded-xl border"
                 style={{
                   backgroundColor: 'var(--bg-card-elevated)',
                   borderColor: 'var(--border-color)'
                 }}
               >
-                <div className="flex items-center gap-2 font-medium mb-1.5 text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
-                  <BookOpen className="w-4 h-4 text-amber-500" />
-                  Your Journal
-                </div>
-                <p className="text-xs leading-normal" style={{ color: 'var(--text-secondary)' }}>
-                  Your entries, raw thoughts, questions, and reflections. This is the personal content you write or speak each day.
+                <h3
+                  className="text-sm font-semibold flex items-center gap-2 mb-2"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  <Sparkles className="w-4 h-4 shrink-0" />
+                  What is ReflectAI?
+                </h3>
+                <p style={{ color: 'var(--text-secondary)' }} className="text-xs sm:text-sm">
+                  ReflectAI is designed to give you a quiet, uncluttered breath in a noisy world.
+                  It is your private space to untangle your thoughts, celebrate small daily wins,
+                  and gain calm perspective without judgment or pressure.
                 </p>
               </div>
 
-              <div
-                className="p-3.5 rounded-xl border"
-                style={{
-                  backgroundColor: 'var(--bg-card-elevated)',
-                  borderColor: 'var(--border-color)'
-                }}
-              >
-                <div className="flex items-center gap-2 font-medium mb-1.5 text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
-                  <Heart className="w-4 h-4 text-emerald-500" />
-                  Your Sanctuary
-                </div>
-                <p className="text-xs leading-normal" style={{ color: 'var(--text-secondary)' }}>
-                  The peaceful environment you create—your soothing theme, daytime or evening mode, calming background hum, and favorite locations in nature.
-                </p>
-              </div>
-            </div>
-          </div>
+              {/* Simple Explanation: Journal vs. Sanctuary */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                  <Compass className="w-3.5 h-3.5" />
+                  Understanding Sanctuary & Journal
+                </h3>
 
-          {/* Key Tools Overview */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-              <Sparkles className="w-3.5 h-3.5" />
-              Helpful Features At A Glance
-            </h3>
-
-            <div className="space-y-2 text-xs">
-              <div
-                className="p-3 rounded-lg border flex items-start gap-2.5"
-                style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}
-              >
-                <Clock className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
-                <div>
-                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Time Capsule: </span>
-                  <span style={{ color: 'var(--text-secondary)' }}>Seal a letter to your future self for 7, 30, 90, or 365 days. When unlocked, celebrate how much you have grown.</span>
-                </div>
-              </div>
-
-              <div
-                className="p-3 rounded-lg border flex items-start gap-2.5"
-                style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}
-              >
-                <Compass className="w-4 h-4 mt-0.5 shrink-0 text-cyan-500" />
-                <div>
-                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Echoes of Mind: </span>
-                  <span style={{ color: 'var(--text-secondary)' }}>See your thoughts arranged like gentle stars across emotional orbits (Calm, Clarity, Gratitude, Courage).</span>
-                </div>
-              </div>
-
-              <div
-                className="p-3 rounded-lg border flex items-start gap-2.5"
-                style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}
-              >
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
-                <div>
-                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Peaceful Locations: </span>
-                  <span style={{ color: 'var(--text-secondary)' }}>Tag a calming place in the world where you wrote or reflected—like a favorite forest, beach, or quiet room.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Expandable FAQs */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                <HelpCircle className="w-3.5 h-3.5" />
-                Frequently Asked Questions
-              </h3>
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                Click to expand
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {FAQ_ITEMS.map((faq, index) => {
-                const isOpen = openFaqIndex === index;
-                return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div
-                    key={index}
-                    className="rounded-xl border overflow-hidden transition"
+                    className="p-3.5 rounded-xl border"
                     style={{
                       backgroundColor: 'var(--bg-card-elevated)',
                       borderColor: 'var(--border-color)'
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggleFaq(index)}
-                      className="w-full px-4 py-3 text-left flex items-center justify-between gap-3 text-xs sm:text-sm font-medium transition cursor-pointer"
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      <span>{faq.question}</span>
-                      {isOpen ? (
-                        <ChevronUp className="w-4 h-4 shrink-0 opacity-60" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 shrink-0 opacity-60" />
-                      )}
-                    </button>
-
-                    {isOpen && (
-                      <div
-                        className="px-4 pb-3.5 pt-1 text-xs sm:text-sm border-t leading-relaxed animate-in fade-in duration-150"
-                        style={{
-                          borderColor: 'var(--border-color)',
-                          color: 'var(--text-secondary)',
-                          backgroundColor: 'var(--bg-card)'
-                        }}
-                      >
-                        {faq.answer}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 font-medium mb-1.5 text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <BookOpen className="w-4 h-4 text-amber-500" />
+                      Your Journal
+                    </div>
+                    <p className="text-xs leading-normal" style={{ color: 'var(--text-secondary)' }}>
+                      Your entries, raw thoughts, questions, and reflections. This is the personal content you write or speak each day.
+                    </p>
                   </div>
-                );
-              })}
+
+                  <div
+                    className="p-3.5 rounded-xl border"
+                    style={{
+                      backgroundColor: 'var(--bg-card-elevated)',
+                      borderColor: 'var(--border-color)'
+                    }}
+                  >
+                    <div className="flex items-center gap-2 font-medium mb-1.5 text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <Heart className="w-4 h-4 text-emerald-500" />
+                      Your Sanctuary
+                    </div>
+                    <p className="text-xs leading-normal" style={{ color: 'var(--text-secondary)' }}>
+                      The peaceful environment you create—your soothing theme, daytime or evening mode, calming background hum, and favorite locations in nature.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Key Tools Overview */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Helpful Features At A Glance
+                </h3>
+
+                <div className="space-y-2 text-xs">
+                  <div
+                    className="p-3 rounded-lg border flex items-start gap-2.5"
+                    style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}
+                  >
+                    <Clock className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                    <div>
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Time Capsule: </span>
+                      <span style={{ color: 'var(--text-secondary)' }}>Seal a letter to your future self for 7, 30, 90, or 365 days. When unlocked, celebrate how much you have grown.</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="p-3 rounded-lg border flex items-start gap-2.5"
+                    style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}
+                  >
+                    <Compass className="w-4 h-4 mt-0.5 shrink-0 text-cyan-500" />
+                    <div>
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Echoes of Mind: </span>
+                      <span style={{ color: 'var(--text-secondary)' }}>See your thoughts arranged like gentle stars across emotional orbits (Calm, Clarity, Gratitude, Courage).</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="p-3 rounded-lg border flex items-start gap-2.5"
+                    style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}
+                  >
+                    <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
+                    <div>
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Peaceful Locations: </span>
+                      <span style={{ color: 'var(--text-secondary)' }}>Tag a calming place in the world where you wrote or reflected—like a favorite forest, beach, or quiet room.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Expandable FAQs */
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  Frequently Asked Questions
+                </h3>
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Click to expand
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {FAQ_ITEMS.map((faq, index) => {
+                  const isOpen = openFaqIndex === index;
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-xl border overflow-hidden transition"
+                      style={{
+                        backgroundColor: 'var(--bg-card-elevated)',
+                        borderColor: 'var(--border-color)'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFaq(index)}
+                        className="w-full px-4 py-3 text-left flex items-center justify-between gap-3 text-xs sm:text-sm font-medium transition cursor-pointer"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <span>{faq.question}</span>
+                        {isOpen ? (
+                          <ChevronUp className="w-4 h-4 shrink-0 opacity-60" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 shrink-0 opacity-60" />
+                        )}
+                      </button>
+
+                      {isOpen && (
+                        <div
+                          className="px-4 pb-3.5 pt-1 text-xs sm:text-sm border-t leading-relaxed animate-in fade-in duration-150"
+                          style={{
+                            borderColor: 'var(--border-color)',
+                            color: 'var(--text-secondary)',
+                            backgroundColor: 'var(--bg-card)'
+                          }}
+                        >
+                          {faq.answer}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer with Privacy and Terms links */}
@@ -379,7 +412,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            id="about-modal-footer-close-btn"
+            onClick={handleDismiss}
             className="px-4 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer"
             style={{
               backgroundColor: 'var(--accent)',

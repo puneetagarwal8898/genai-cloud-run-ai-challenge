@@ -19,7 +19,11 @@ import {
   CheckCircle2,
   Play,
   Square,
-  Radio
+  Radio,
+  ExternalLink,
+  Upload,
+  Crop,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
@@ -36,26 +40,19 @@ import {
 } from '../utils/voiceUtils';
 import { verifyTotpToken } from '../utils/totp';
 import { ExportDownloadHistory } from './ExportDownloadHistory';
+import { CURATED_AVATARS, CuratedAvatar } from '../data/curatedAvatars';
+import { AvatarCropperModal } from './AvatarCropperModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultTab?: 'profile' | 'preferences' | 'security';
   onTabChange?: (tab: 'profile' | 'preferences' | 'security') => void;
-  onOpenAbout?: () => void;
-  onOpenLegal?: () => void;
+  onOpenAbout?: (tab?: 'about' | 'faq') => void;
+  onOpenLegal?: (tab?: 'privacy' | 'terms') => void;
   onOpenTwoFactorSetup?: () => void;
   onOpenExportPdf?: () => void;
 }
-
-const MINDFUL_AVATARS = [
-  { id: 'lotus', name: 'Lotus Awakening', url: 'https://images.unsplash.com/photo-1508615039623-a25605d2b022?w=150&auto=format&fit=crop&q=80' },
-  { id: 'bamboo', name: 'Bamboo Serenity', url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=150&auto=format&fit=crop&q=80' },
-  { id: 'mist', name: 'Morning Mist', url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=150&auto=format&fit=crop&q=80' },
-  { id: 'pebble', name: 'Zen Pebble', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?w=150&auto=format&fit=crop&q=80' },
-  { id: 'forest', name: 'Earthy Forest', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=150&auto=format&fit=crop&q=80' },
-  { id: 'water', name: 'Flowing Stream', url: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?w=150&auto=format&fit=crop&q=80' },
-];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -83,10 +80,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onTabChange?.(tab);
   };
 
+  // Helper to detect unwanted legacy female photo or external unsplash placeholder
+  const isFemalePhoto = (url?: string | null): boolean => {
+    if (!url) return false;
+    return (
+      url.includes('1534528741775-53994a69daeb') ||
+      url.includes('photo-1534528741775') ||
+      url.includes('1535713875002-d1d0cf377fde') ||
+      url.includes('1507003211169-0a1dd7228f2d') ||
+      url.includes('images.unsplash.com')
+    );
+  };
+
   // Profile fields
   const [displayName, setDisplayName] = useState(userProfile?.displayName || user?.displayName || '');
-  const [selectedAvatar, setSelectedAvatar] = useState(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
-  const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(() => {
+    const current = userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL;
+    if (!current || isFemalePhoto(current)) {
+      return CURATED_AVATARS[0].svgDataUri;
+    }
+    return current;
+  });
+  const [uploadedAvatar, setUploadedAvatar] = useState<string | null>(() => {
+    const current = userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL;
+    if (current && !isFemalePhoto(current) && !CURATED_AVATARS.some(a => a.svgDataUri === current)) {
+      return current;
+    }
+    return null;
+  });
+  const [avatarCategory, setAvatarCategory] = useState<'all' | 'people' | 'nature' | 'buildings' | 'landmarks'>('all');
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+  const [cropperFileName, setCropperFileName] = useState<string>('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Check if current selected avatar is one of the 24 default curated avatars
+  const isCuratedAvatarSelected = CURATED_AVATARS.some(a => a.svgDataUri === selectedAvatar);
+  // Cropping is enabled ONLY if the user has uploaded a custom photo and it is currently selected
+  const canCropCustomPhoto = Boolean(
+    !isCuratedAvatarSelected &&
+    uploadedAvatar &&
+    selectedAvatar === uploadedAvatar
+  );
 
   // Preference fields
   const [ambientSound, setAmbientSound] = useState(userProfile?.preferences?.ambientSound ?? userProfile?.preferences?.ambientSoundEnabled ?? true);
@@ -129,8 +166,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (isOpen) {
       setActiveTab(defaultTab);
       setDisplayName(userProfile?.displayName || user?.displayName || '');
-      setSelectedAvatar(userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL || MINDFUL_AVATARS[0].url);
-      setCustomAvatarUrl('');
+      const rawPic = userProfile?.photoURL || userProfile?.avatarUrl || user?.photoURL;
+      if (!rawPic || isFemalePhoto(rawPic)) {
+        setSelectedAvatar(CURATED_AVATARS[0].svgDataUri);
+        setUploadedAvatar(null);
+      } else if (!CURATED_AVATARS.some(a => a.svgDataUri === rawPic)) {
+        setSelectedAvatar(rawPic);
+        setUploadedAvatar(rawPic);
+      } else {
+        setSelectedAvatar(rawPic);
+        setUploadedAvatar(null);
+      }
+      setUploadError(null);
+      setShowCropper(false);
       const rawVoice = userProfile?.preferences?.selectedVoiceId || localStorage.getItem('reflectai_selected_voice_id');
       setSelectedVoiceId(normalizeVoiceId(rawVoice));
       setPreviewingVoiceId(null);
@@ -145,6 +193,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setDeleteError(null);
     }
   }, [isOpen, defaultTab, userProfile, user]);
+
+  const handleFileSelect = (file: File) => {
+    setUploadError(null);
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please choose a valid image file (PNG, JPG, WebP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Image size exceeds 5MB. Please choose a smaller photo.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImageSrc(reader.result as string);
+      setCropperFileName(file.name);
+      setShowCropper(true);
+    };
+    reader.onerror = () => {
+      setUploadError('Unable to read selected photo.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = (croppedDataUrl: string) => {
+    setSelectedAvatar(croppedDataUrl);
+    setUploadedAvatar(croppedDataUrl);
+    setSaveSuccess(false);
+  };
 
   // Handle Escape key & cleanup
   React.useEffect(() => {
@@ -270,7 +346,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const matchedVoice = CURATED_VOICES.find(v => v.id === normalized) || CURATED_VOICES[0];
       await updateUserProfileData({
         displayName: displayName.trim() || 'Mindful Soul',
-        photoURL: customAvatarUrl.trim() || selectedAvatar,
+        photoURL: selectedAvatar,
         preferences: {
           ambientSound,
           ambientSoundEnabled: ambientSound,
@@ -598,74 +674,186 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-6">
               {/* Avatar Selector */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-                  Your Avatar
-                </label>
+              <div
+                className={`rounded-2xl p-4 border transition-all ${
+                  isDraggingFile ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/30' : 'border-[var(--border-color)] bg-[var(--bg-card)]'
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(true);
+                }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                  }
+                }}
+              >
+                {/* Simplified Top Row: Avatar preview + Profile Avatar label on left, Upload Photo button on right */}
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      id="profile-selected-avatar-button"
+                      disabled={!canCropCustomPhoto}
+                      onClick={() => {
+                        // Only allow cropping if the user has selected their uploaded custom photo
+                        if (canCropCustomPhoto && uploadedAvatar) {
+                          setCropperImageSrc(uploadedAvatar);
+                          setCropperFileName('My Uploaded Photo');
+                          setShowCropper(true);
+                        }
+                      }}
+                      className={`relative shrink-0 rounded-full transition-all ${
+                        canCropCustomPhoto
+                          ? 'cursor-pointer hover:ring-2 hover:ring-[var(--accent)] hover:opacity-90'
+                          : 'cursor-default'
+                      }`}
+                      title={
+                        canCropCustomPhoto
+                          ? 'Click to crop or adjust your custom photo'
+                          : undefined
+                      }
+                    >
+                      <img
+                        src={selectedAvatar || CURATED_AVATARS[0].svgDataUri}
+                        alt="Profile Avatar"
+                        crossOrigin="anonymous"
+                        className="w-12 h-12 rounded-full object-cover shadow-sm border-2"
+                        style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--bg-card-elevated)' }}
+                        referrerPolicy="no-referrer"
+                      />
+                      {canCropCustomPhoto && (
+                        <span
+                          className="absolute -bottom-0.5 -right-0.5 p-1 rounded-full text-white shadow-xs"
+                          style={{ backgroundColor: 'var(--accent)' }}
+                          title="Custom photo - click to crop"
+                        >
+                          <Crop className="w-2.5 h-2.5 stroke-[2.5]" />
+                        </span>
+                      )}
+                    </button>
+                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      Profile Avatar
+                    </label>
+                  </div>
 
-                <div className="flex items-center gap-4 mb-3">
-                  <img
-                    src={selectedAvatar}
-                    alt="Active Avatar"
-                    className="w-14 h-14 rounded-full object-cover shadow-sm border-2"
-                    style={{ borderColor: 'var(--accent)' }}
-                    referrerPolicy="no-referrer"
-                  />
-                  <div>
-                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                      Choose an avatar or paste your own image link
-                    </p>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      Shows next to your thoughts and in your sanctuary header
-                    </p>
+                  {/* Upload Photo Button */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileSelect(e.target.files[0]);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      id="upload-avatar-file-button"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      style={{
+                        backgroundColor: 'var(--bg-card-elevated)',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-primary)'
+                      }}
+                      title="Upload a photo from your computer (under 5MB)"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Photo</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-6 gap-2">
-                  {MINDFUL_AVATARS.map((avatar) => (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedAvatar(avatar.url);
-                        setCustomAvatarUrl('');
-                      }}
-                      className={`group relative rounded-xl overflow-hidden aspect-square border-2 transition-all cursor-pointer ${
-                        selectedAvatar === avatar.url ? 'scale-105 shadow-md' : 'opacity-70 hover:opacity-100'
-                      }`}
-                      style={{
-                        borderColor: selectedAvatar === avatar.url ? 'var(--accent)' : 'var(--border-color)'
-                      }}
-                    >
-                      <img
-                        src={avatar.url}
-                        alt={avatar.name}
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                      <span className="absolute inset-x-0 bottom-0 bg-black/60 text-[9px] text-white py-0.5 text-center truncate px-1">
-                        {avatar.name.split(' ')[0]}
-                      </span>
-                    </button>
-                  ))}
+                {uploadError && (
+                  <div className="mb-3 p-2 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center gap-2 text-xs text-rose-600 dark:text-rose-300">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+
+                {/* Category Filters */}
+                <div className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-1 custom-scrollbar">
+                  {[
+                    { id: 'all', label: 'All', count: 24 },
+                    { id: 'people', label: 'Characters', count: 6 },
+                    { id: 'nature', label: 'Nature', count: 6 },
+                    { id: 'buildings', label: 'Architecture', count: 6 },
+                    { id: 'landmarks', label: 'Landmarks', count: 6 },
+                  ].map((cat) => {
+                    const isActive = avatarCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setAvatarCategory(cat.id as any)}
+                        className={`text-xs px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
+                          isActive
+                            ? 'text-white shadow-xs'
+                            : 'opacity-70 hover:opacity-100'
+                        }`}
+                        style={{
+                          backgroundColor: isActive ? 'var(--accent)' : 'var(--bg-card-elevated)',
+                          border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'}`,
+                          color: isActive ? '#ffffff' : 'var(--text-secondary)'
+                        }}
+                      >
+                        <span>{cat.label}</span>
+                        <span className={`text-[10px] px-1 py-0.2 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10'}`}>
+                          {cat.count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <div className="mt-3">
-                  <input
-                    type="url"
-                    placeholder="Or paste an image link (https://...)"
-                    value={customAvatarUrl}
-                    onChange={(e) => {
-                      setCustomAvatarUrl(e.target.value);
-                      if (e.target.value.trim()) setSelectedAvatar(e.target.value.trim());
-                    }}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border focus:outline-none transition"
-                    style={{
-                      backgroundColor: 'var(--bg-input)',
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
+                {/* 24 Curated Avatars Grid: Compact thumbnail size (44px-48px) - Strictly shows only curated avatars */}
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 p-1.5 rounded-xl border max-h-[170px] overflow-y-auto custom-scrollbar" style={{ backgroundColor: 'var(--bg-card-elevated)', borderColor: 'var(--border-color)' }}>
+                  {CURATED_AVATARS.filter(a => avatarCategory === 'all' || a.category === avatarCategory).map((avatar) => {
+                    const isSelected = selectedAvatar === avatar.svgDataUri;
+                    return (
+                      <button
+                        key={avatar.id}
+                        id={`avatar-option-${avatar.id}`}
+                        type="button"
+                        title={avatar.name}
+                        onClick={() => {
+                          setSelectedAvatar(avatar.svgDataUri);
+                          setUploadError(null);
+                        }}
+                        className={`group relative rounded-xl aspect-square border-2 transition-all cursor-pointer p-1 flex items-center justify-center ${
+                          isSelected
+                            ? 'scale-105 shadow-md ring-2 ring-[var(--accent)]/40 border-[var(--accent)] z-10'
+                            : 'opacity-80 hover:opacity-100 border-[var(--border-color)] hover:border-[var(--accent)]/60 hover:scale-105'
+                        }`}
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          minHeight: '44px',
+                          maxHeight: '48px'
+                        }}
+                      >
+                        <img
+                          src={avatar.svgDataUri}
+                          alt={avatar.name}
+                          className="w-full h-full object-contain rounded-lg"
+                          referrerPolicy="no-referrer"
+                        />
+                        {isSelected && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shadow-xs">
+                            <Check className="w-2 h-2 stroke-[3]" />
+                          </span>
+                        )}
+                        <span className="sr-only">{avatar.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1288,7 +1476,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  Download an archival copy of all your personal reflections locally to your computer in PDF format. For privacy, downloading requires entering your account password and your 6-digit authenticator code.
+                  {userProfile?.twoFactorEnabled
+                    ? 'Download an archival copy of all your personal reflections locally to your computer in PDF format. For privacy, downloading requires verifying your 6-digit authenticator code and setting a document password.'
+                    : userProfile?.authProvider === 'email'
+                    ? 'Download an archival copy of all your personal reflections locally to your computer in PDF format. For privacy, downloading requires verifying your account password and setting a document password.'
+                    : 'Download an archival copy of all your personal reflections locally to your computer in PDF format. For privacy, downloading requires confirming your account email and setting a document password.'}
                 </p>
 
                 <button
@@ -1312,9 +1504,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <ExportDownloadHistory userId={userProfile?.uid} defaultExpanded={false} />
               </div>
 
-              {/* Password Reset Section */}
-              {userProfile?.email && (
+              {/* Password Reset Section (Email Accounts) OR Provider Security Information (Google/Federated) */}
+              {userProfile?.authProvider === 'email' ? (
                 <div
+                  id="reset-account-password-card"
                   className="p-4 rounded-xl border space-y-2.5"
                   style={{
                     backgroundColor: 'var(--bg-card-elevated)',
@@ -1326,7 +1519,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Reset Account Password
                   </div>
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    Send a secure link to {userProfile.email} to choose a new password.
+                    Send a secure link to {userProfile?.email} to choose a new password.
                   </p>
                   {resetSent && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
@@ -1337,7 +1530,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="button"
                     onClick={handleSendPasswordReset}
                     disabled={resetLoading}
-                    className="px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer border"
+                    className="px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer border hover:opacity-85"
                     style={{
                       backgroundColor: 'var(--bg-card)',
                       borderColor: 'var(--border-color)',
@@ -1346,6 +1539,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {resetLoading ? 'Sending...' : 'Send Password Reset Email'}
                   </button>
+                </div>
+              ) : (
+                <div
+                  id="provider-security-card"
+                  className="p-4 rounded-xl border space-y-2.5"
+                  style={{
+                    backgroundColor: 'var(--bg-card-elevated)',
+                    borderColor: 'var(--border-color)'
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-medium text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <Shield className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                      <span>Federated Identity Provider Security</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      {userProfile?.authProvider || 'Google'} Auth
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    You signed in using your <strong className="capitalize">{userProfile?.authProvider || 'Google'}</strong> account (<strong className="font-mono">{userProfile?.email}</strong>). Because identity verification is handled directly by your provider, you do not have a separate password stored in ReflectAI.
+                  </p>
+                  <div className="pt-1 flex flex-wrap items-center gap-2 text-xs">
+                    {userProfile?.authProvider === 'google' || !userProfile?.authProvider ? (
+                      <a
+                        href="https://myaccount.google.com/security"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-90"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                        <span>Manage Google Account Security</span>
+                      </a>
+                    ) : null}
+                    <span className="text-[11px] opacity-75" style={{ color: 'var(--text-muted)' }}>
+                      Password and MFA credentials are administered externally by your identity provider.
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -1390,28 +1626,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {onOpenAbout && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onOpenAbout();
-                      }}
-                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-85"
-                      style={{
-                        backgroundColor: 'var(--bg-card)',
-                        borderColor: 'var(--border-color)',
-                        color: 'var(--text-primary)'
-                      }}
-                    >
-                      About & FAQ
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        id="settings-open-about-btn"
+                        onClick={() => {
+                          onClose();
+                          onOpenAbout('about');
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-85"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        About
+                      </button>
+                      <button
+                        type="button"
+                        id="settings-open-faq-btn"
+                        onClick={() => {
+                          onClose();
+                          onOpenAbout('faq');
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-85"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-color)',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        FAQ
+                      </button>
+                    </>
                   )}
                   {onOpenLegal && (
                     <button
                       type="button"
+                      id="settings-open-privacy-terms-btn"
                       onClick={() => {
                         onClose();
-                        onOpenLegal();
+                        onOpenLegal('privacy');
                       }}
                       className="px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-85"
                       style={{
@@ -1515,7 +1771,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="p-2 rounded-lg border text-[11px] leading-relaxed" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+                        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>Identity Verification:</span> Authenticated via <strong className="capitalize">{userProfile?.authProvider || 'Google'}</strong>. No local password required. Type <strong className="text-rose-600 dark:text-rose-400">DELETE</strong> to confirm permanent deletion.
+                      </div>
+                    )}
                     {deleteError && (
                       <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150">
                         <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
@@ -1568,6 +1828,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
         </div>
       </motion.div>
+
+      {/* Interactive Avatar Cropper & Compressor Modal */}
+      {showCropper && cropperImageSrc && (
+        <AvatarCropperModal
+          isOpen={showCropper}
+          imageSrc={cropperImageSrc}
+          fileName={cropperFileName}
+          onClose={() => {
+            setShowCropper(false);
+            setCropperImageSrc(null);
+          }}
+          onCropComplete={(croppedDataUrl) => {
+            handleCropComplete(croppedDataUrl);
+            setShowCropper(false);
+            setCropperImageSrc(null);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -29,6 +29,27 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { AuthProviderType, UserProfile, UserPreferences } from '../types';
 import { wipeAllUserData, archiveAndWipeUserData, sanitizePayload } from '../services/journalService';
 import { verifyTotpToken } from '../utils/totp';
+import { CURATED_AVATARS } from '../data/curatedAvatars';
+
+// Detect and scrub any legacy female photos / placeholders
+export const isFemalePhoto = (url?: string | null): boolean => {
+  if (!url) return false;
+  return (
+    url.includes('1534528741775-53994a69daeb') ||
+    url.includes('photo-1534528741775') ||
+    url.includes('1535713875002-d1d0cf377fde') ||
+    url.includes('1507003211169-0a1dd7228f2d') ||
+    url.includes('images.unsplash.com')
+  );
+};
+
+// Ensures the yellow person avatar (first avatar, Zen Meditator) is always the safe default
+export const sanitizeAvatarUrl = (url?: string | null): string => {
+  if (!url || isFemalePhoto(url)) {
+    return CURATED_AVATARS[0].svgDataUri;
+  }
+  return url;
+};
 
 export interface PendingVerification {
   email: string;
@@ -323,7 +344,7 @@ function createMockUser(profile: UserProfile): User {
     uid: profile.uid,
     email: profile.email,
     displayName: profile.displayName,
-    photoURL: profile.photoURL,
+    photoURL: sanitizeAvatarUrl(profile.photoURL),
     emailVerified: Boolean(profile.emailVerified),
     isAnonymous: false,
     metadata: {},
@@ -367,6 +388,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (storedUser) {
         try {
           const parsed: UserProfile = JSON.parse(storedUser);
+          if (!parsed.photoURL || isFemalePhoto(parsed.photoURL)) {
+            parsed.photoURL = CURATED_AVATARS[0].svgDataUri;
+            try {
+              localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(parsed));
+            } catch {}
+          }
           const twoFa = await resolve2FAStatus(parsed.email, parsed.uid);
           if (twoFa.enabled && twoFa.secret) {
             parsed.twoFactorEnabled = true;
@@ -491,6 +518,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const saveActiveSession = (profile: UserProfile) => {
+    if (!profile.photoURL || isFemalePhoto(profile.photoURL)) {
+      profile.photoURL = CURATED_AVATARS[0].svgDataUri;
+    }
     localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
     if (profile.authProvider && profile.authProvider !== 'demo') {
       const p = profile.authProvider as AuthProviderType;
@@ -508,6 +538,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleAuthenticationSuccess = async (profile: UserProfile, fbUser?: User | null) => {
+    if (!profile.photoURL || isFemalePhoto(profile.photoURL)) {
+      profile.photoURL = CURATED_AVATARS[0].svgDataUri;
+    }
     // 1. Resolve 2FA status thoroughly across all storage layers (Registry, Accounts, Firestore)
     const twoFa = await resolve2FAStatus(profile.email, profile.uid);
     if (twoFa.enabled && twoFa.secret) {
@@ -802,7 +835,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           uid: 'google_user_' + Math.random().toString(36).substring(2, 9),
           email: 'google.journaler@gmail.com',
           displayName: 'Google Authenticated User',
-          photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          photoURL: CURATED_AVATARS[0].svgDataUri,
           authProvider: 'google',
           emailVerified: true,
           createdAt: new Date().toISOString(),
@@ -834,7 +867,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           uid: 'twitter_user_' + Math.random().toString(36).substring(2, 9),
           email: 'x.reflector@twitter.internal',
           displayName: 'X / Twitter User',
-          photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          photoURL: CURATED_AVATARS[0].svgDataUri,
           authProvider: 'twitter',
           emailVerified: true,
           createdAt: new Date().toISOString(),
@@ -893,7 +926,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           uid: 'linkedin_user_' + Math.random().toString(36).substring(2, 9),
           email: 'professional.reflector@linkedin.com',
           displayName: 'LinkedIn Authenticated User',
-          photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+          photoURL: CURATED_AVATARS[0].svgDataUri,
           authProvider: 'linkedin',
           emailVerified: true,
           createdAt: new Date().toISOString(),
@@ -1006,7 +1039,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const activeAuth = getActiveAuth();
         const userCred = await createUserWithEmailAndPassword(activeAuth, trimmedEmail, password);
         if (userCred.user) {
-          await updateProfile(userCred.user, { displayName: assignedDisplayName }).catch(() => {});
+          await updateProfile(userCred.user, { displayName: assignedDisplayName, photoURL: CURATED_AVATARS[0].svgDataUri }).catch(() => {});
           // Dispatch verification email via Firebase (Google's infrastructure)
           await sendEmailVerification(userCred.user).catch((err) => {
             console.warn("Firebase email verification dispatch notice:", err.message);
@@ -1016,7 +1049,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             uid: userCred.user.uid,
             email: userCred.user.email || trimmedEmail,
             displayName: assignedDisplayName,
-            photoURL: null,
+            photoURL: CURATED_AVATARS[0].svgDataUri,
             authProvider: 'email',
             emailVerified: userCred.user.emailVerified,
             createdAt: userCred.user.metadata.creationTime || new Date().toISOString(),
@@ -1076,14 +1109,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Now create the brand-new account with clean credentials
               const freshCred = await createUserWithEmailAndPassword(activeAuth, trimmedEmail, password);
               if (freshCred.user) {
-                await updateProfile(freshCred.user, { displayName: assignedDisplayName, photoURL: '' }).catch(() => {});
+                await updateProfile(freshCred.user, { displayName: assignedDisplayName, photoURL: CURATED_AVATARS[0].svgDataUri }).catch(() => {});
                 await sendEmailVerification(freshCred.user).catch(() => {});
 
                 const cleanProfile: UserProfile = {
                   uid: freshCred.user.uid,
                   email: freshCred.user.email || trimmedEmail,
                   displayName: assignedDisplayName,
-                  photoURL: null,
+                  photoURL: CURATED_AVATARS[0].svgDataUri,
                   authProvider: 'email',
                   emailVerified: freshCred.user.emailVerified,
                   createdAt: freshCred.user.metadata.creationTime || new Date().toISOString(),
@@ -1141,7 +1174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: 'local_user_' + Math.random().toString(36).substring(2, 9),
       email: trimmedEmail,
       displayName: assignedDisplayName,
-      photoURL: null,
+      photoURL: CURATED_AVATARS[0].svgDataUri,
       authProvider: 'email',
       emailVerified: false,
       createdAt: new Date().toISOString(),
@@ -1220,7 +1253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: stableUid,
       email: pending.email,
       displayName: pending.displayName,
-      photoURL: null,
+      photoURL: CURATED_AVATARS[0].svgDataUri,
       authProvider: 'email',
       emailVerified: true,
       createdAt: new Date().toISOString(),
@@ -1452,7 +1485,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: persistentDemoId,
         email: 'tester.demo@reflectai.internal',
         displayName: 'Demo Testing User',
-        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+        photoURL: CURATED_AVATARS[0].svgDataUri,
         authProvider: 'demo',
         emailVerified: true,
         createdAt: '2026-09-01T00:00:00.000Z',

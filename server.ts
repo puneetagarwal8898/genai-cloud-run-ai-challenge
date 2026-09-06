@@ -807,6 +807,94 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Secure Image Proxy Endpoint (CORS-friendly avatar loader to prevent tainted canvas exceptions)
+app.get("/api/proxy-image", async (req, res) => {
+  try {
+    const rawUrl = typeof req.query.url === "string" ? req.query.url.trim() : "";
+    if (!rawUrl) {
+      res.status(400).json({ error: "Missing url query parameter" });
+      return;
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      res.status(400).json({ error: "Invalid URL format" });
+      return;
+    }
+
+    // SSRF Defense: Restrict protocol strictly to HTTP/HTTPS
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      res.status(400).json({ error: "Only HTTP and HTTPS protocols are allowed" });
+      return;
+    }
+
+    // SSRF Defense: Block loopback, private networks, and cloud metadata endpoints
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const disallowedHosts = [
+      "localhost",
+      "127.0.0.1",
+      "::1",
+      "0.0.0.0",
+      "169.254.169.254",
+      "metadata.google.internal",
+      "metadata.google",
+    ];
+
+    if (
+      disallowedHosts.includes(hostname) ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+    ) {
+      res.status(403).json({ error: "Access to local or private network addresses is forbidden" });
+      return;
+    }
+
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 8000); // 8 second timeout
+
+    const fetchResponse = await fetch(parsedUrl.toString(), {
+      signal: abortController.signal,
+      headers: {
+        "User-Agent": "ReflectAI-AvatarProxy/1.0",
+        Accept: "image/jpeg,image/png,image/webp,image/gif,image/*;q=0.8"
+      }
+    });
+    clearTimeout(timeout);
+
+    if (!fetchResponse.ok) {
+      res.status(fetchResponse.status).json({ error: `Image fetch failed with status ${fetchResponse.status}` });
+      return;
+    }
+
+    const contentType = fetchResponse.headers.get("content-type") || "";
+    if (!contentType.startsWith("image/")) {
+      res.status(400).json({ error: "Remote resource is not an image" });
+      return;
+    }
+
+    const arrayBuffer = await fetchResponse.arrayBuffer();
+    // 5MB maximum image buffer enforcement
+    if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
+      res.status(400).json({ error: "Image size exceeds 5MB limit" });
+      return;
+    }
+
+    const buffer = Buffer.from(arrayBuffer);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  } catch (err: any) {
+    console.error("Image proxy error:", err);
+    res.status(500).json({ error: "Failed to fetch and proxy image" });
+  }
+});
+
 // Gemini Multi-turn Reflection & Conversational API
 app.post("/api/gemini/converse", async (req, res) => {
   try {

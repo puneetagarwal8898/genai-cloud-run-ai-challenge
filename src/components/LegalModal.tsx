@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, FileText, Lock, Trash2, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { X, ShieldCheck, FileText, Lock, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface LegalModalProps {
   isOpen: boolean;
@@ -23,11 +23,20 @@ export const LegalModal: React.FC<LegalModalProps> = ({
     }
   }, [isOpen, initialTab]);
 
+  // Unified dismiss handler: if onBack is provided (e.g. from Settings), return to Settings; otherwise close
+  const handleDismiss = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      onClose();
+    }
+  };
+
   // Handle Escape key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        onClose();
+        handleDismiss();
       }
     };
     if (isOpen) {
@@ -36,7 +45,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onBack, onClose]);
 
   if (!isOpen) return null;
 
@@ -47,7 +56,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
       id="legal-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          onClose();
+          handleDismiss();
         }
       }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
@@ -74,6 +83,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
             <div className="flex rounded-lg p-0.5 border" style={{ borderColor: 'var(--border-color)' }}>
               <button
                 type="button"
+                id="legal-tab-btn-privacy"
                 onClick={() => setActiveTab('privacy')}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'privacy' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
@@ -89,6 +99,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
 
               <button
                 type="button"
+                id="legal-tab-btn-terms"
                 onClick={() => setActiveTab('terms')}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'terms' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
@@ -105,35 +116,18 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {onBack ? (
-              <button
-                id="legal-modal-back-btn"
-                type="button"
-                onClick={onBack}
-                aria-label="Back to Settings"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
-              </button>
-            ) : (
-              <button
-                onClick={onClose}
-                aria-label="Close legal window"
-                className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              id="legal-modal-close-btn"
+              onClick={handleDismiss}
+              aria-label="Close legal window"
+              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -275,7 +269,8 @@ export const LegalModal: React.FC<LegalModalProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            id="legal-modal-footer-close-btn"
+            onClick={handleDismiss}
             className="px-4 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer"
             style={{
               backgroundColor: 'var(--accent)',

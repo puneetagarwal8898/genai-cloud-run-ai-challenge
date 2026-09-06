@@ -53,6 +53,18 @@ import { AudioNarrationPlayer } from './AudioNarrationPlayer';
 import { SanctuaryVoiceInput } from './SanctuaryVoiceInput';
 import { InfoTooltip } from './InfoTooltip';
 import { ResponsiveIconButton } from './ResponsiveIconButton';
+import { CURATED_AVATARS } from '../data/curatedAvatars';
+
+const isFemalePhoto = (url?: string | null): boolean => {
+  if (!url) return false;
+  return (
+    url.includes('1534528741775-53994a69daeb') ||
+    url.includes('photo-1534528741775') ||
+    url.includes('1535713875002-d1d0cf377fde') ||
+    url.includes('1507003211169-0a1dd7228f2d') ||
+    url.includes('images.unsplash.com')
+  );
+};
 
 // Thoughtful, joyful reflections while the AI is reflecting
 const THINKING_PHRASES = [
@@ -75,6 +87,10 @@ export const Dashboard: React.FC = () => {
     enableTwoFactorAuth
   } = useAuth();
   const { appEnv, setAppEnv, isProductionLocked } = useApp();
+
+  const userAvatarSrc = (!userProfile?.photoURL || isFemalePhoto(userProfile.photoURL))
+    ? CURATED_AVATARS[0].svgDataUri
+    : userProfile.photoURL;
 
   const [interactions, setInteractions] = useState<JournalInteraction[]>([]);
   const [activeInteractionId, setActiveInteractionId] = useState<string | null>(null);
@@ -113,6 +129,7 @@ export const Dashboard: React.FC = () => {
   const [showTimeCapsule, setShowTimeCapsule] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
+  const [aboutModalTab, setAboutModalTab] = useState<'about' | 'faq'>('about');
   const [showLegalModal, setShowLegalModal] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms'>('privacy');
   const [navigatedFromSettings, setNavigatedFromSettings] = useState<boolean>(false);
@@ -121,6 +138,9 @@ export const Dashboard: React.FC = () => {
   const mobileEnhancementsRef = useRef<HTMLDivElement | null>(null);
   const [showMobileProfileMenu, setShowMobileProfileMenu] = useState<boolean>(false);
   const mobileProfileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // User-initiated interaction flag to strictly avoid auto-scrolling during initial mount or login
+  const hasUserInteractedRef = useRef<boolean>(false);
 
   // Helper to sync modal state to URL query parameters without full page reloads
   const syncModalUrl = (modalName: string | null, tabName?: string | null) => {
@@ -163,7 +183,12 @@ export const Dashboard: React.FC = () => {
         } else if (modal === '2fa-setup') {
           setSettingsDefaultTab('security');
           setShowTwoFactorSetup(true);
-        } else if (modal === 'about') {
+        } else if (modal === 'about' || modal === 'faq') {
+          if (modal === 'faq' || tab === 'faq') {
+            setAboutModalTab('faq');
+          } else {
+            setAboutModalTab('about');
+          }
           setShowAboutModal(true);
         } else if (modal === 'legal') {
           if (tab === 'terms' || tab === 'privacy') {
@@ -214,7 +239,7 @@ export const Dashboard: React.FC = () => {
     } else if (showSettingsModal) {
       syncModalUrl('settings', settingsDefaultTab);
     } else if (showAboutModal) {
-      syncModalUrl('about');
+      syncModalUrl('about', aboutModalTab);
     } else if (showLegalModal) {
       syncModalUrl('legal', legalModalTab);
     } else if (showResonanceMap) {
@@ -238,6 +263,7 @@ export const Dashboard: React.FC = () => {
     showTimeCapsule,
     showLocationModal,
     showAboutModal,
+    aboutModalTab,
     showLegalModal,
     legalModalTab,
     showVerifyModal
@@ -390,12 +416,14 @@ export const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [isSubmitting]);
 
-  // Scroll to bottom when trail updates or during thinking
+  // Scroll to bottom when trail updates or during thinking - only when user actively converses
   useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (hasUserInteractedRef.current && (conversationTrail.length > 0 || isSubmitting)) {
+      conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [conversationTrail, isSubmitting, suggestedPrompts]);
 
-  // Load user's isolated interactions on mount
+  // Load user's isolated interactions on mount - start with clean blank reflection
   useEffect(() => {
     if (!currentUserId) return;
     loadHistory();
@@ -406,9 +434,8 @@ export const Dashboard: React.FC = () => {
     try {
       const list = await fetchUserInteractions(currentUserId);
       setInteractions(list);
-      if (list.length > 0 && !activeInteractionId) {
-        selectInteraction(list[0]);
-      }
+      // Clean slate on login: start with a fresh blank reflection ready for the user to write
+      // User can tap any historical reflection in the history panel if they choose
     } catch (err: any) {
       console.error("Failed to load interactions:", err);
       setActionError("Failed to fetch journal history.");
@@ -418,6 +445,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const selectInteraction = (item: JournalInteraction) => {
+    hasUserInteractedRef.current = false;
     setActiveInteractionId(item.id);
     setTitle(item.title);
     setMode(item.mode);
@@ -436,6 +464,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const startNewEntry = () => {
+    hasUserInteractedRef.current = false;
     setActiveInteractionId(null);
     setTitle('');
     setPrompt('');
@@ -506,6 +535,9 @@ export const Dashboard: React.FC = () => {
       setShowVerifyModal(true);
       return;
     }
+
+    // Flag user-initiated interaction so the auto-scroll smoothly follows this deliberate conversation
+    hasUserInteractedRef.current = true;
 
     // Erase the prompt from textbox immediately
     setPrompt('');
@@ -924,6 +956,7 @@ export const Dashboard: React.FC = () => {
               showText={showHeaderNavLabels}
               onClick={() => {
                 setNavigatedFromSettings(false);
+                setAboutModalTab('about');
                 setShowAboutModal(true);
               }}
               ariaLabel="About Sanctuary & FAQ"
@@ -1055,6 +1088,7 @@ export const Dashboard: React.FC = () => {
                     onClick={() => {
                       setShowMobileEnhancements(false);
                       setNavigatedFromSettings(false);
+                      setAboutModalTab('about');
                       setShowAboutModal(true);
                     }}
                     className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
@@ -1107,22 +1141,13 @@ export const Dashboard: React.FC = () => {
               }}
               title={`${userProfile?.displayName || "Reflector"} - Account options`}
             >
-              {userProfile?.photoURL ? (
-                <img
-                  src={userProfile.photoURL}
-                  alt={userProfile.displayName || "User"}
-                  referrerPolicy="no-referrer"
-                  className="w-7 h-7 rounded-full object-cover border shrink-0"
-                  style={{ borderColor: 'var(--border-color)' }}
-                />
-              ) : (
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
-                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                >
-                  <UserIcon className="w-3.5 h-3.5" />
-                </div>
-              )}
+              <img
+                src={userAvatarSrc}
+                alt={userProfile?.displayName || "User"}
+                referrerPolicy="no-referrer"
+                className="w-7 h-7 rounded-full object-cover border shrink-0"
+                style={{ borderColor: 'var(--border-color)' }}
+              />
             </button>
 
             {/* Mobile Profile Dropdown Menu - clamped safely with fixed/absolute right-0 to prevent any clipping */}
@@ -1139,22 +1164,13 @@ export const Dashboard: React.FC = () => {
               >
                 {/* Person's name and email clearly displayed inside the menu */}
                 <div className="px-3 py-2.5 mb-1.5 rounded-xl border flex items-center gap-2.5" style={{ backgroundColor: 'var(--bg-canvas)', borderColor: 'var(--border-color)' }}>
-                  {userProfile?.photoURL ? (
-                    <img
-                      src={userProfile.photoURL}
-                      alt={userProfile.displayName || "User"}
-                      referrerPolicy="no-referrer"
-                      className="w-9 h-9 rounded-full object-cover border shrink-0"
-                      style={{ borderColor: 'var(--border-color)' }}
-                    />
-                  ) : (
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 font-medium"
-                      style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
-                    >
-                      <UserIcon className="w-4 h-4" />
-                    </div>
-                  )}
+                  <img
+                    src={userAvatarSrc}
+                    alt={userProfile?.displayName || "User"}
+                    referrerPolicy="no-referrer"
+                    className="w-9 h-9 rounded-full object-cover border shrink-0"
+                    style={{ borderColor: 'var(--border-color)' }}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold truncate leading-tight" style={{ color: 'var(--text-primary)' }}>
                       {userProfile?.displayName || "Reflector"}
@@ -1199,6 +1215,7 @@ export const Dashboard: React.FC = () => {
                     role="menuitem"
                     onClick={() => {
                       setShowMobileProfileMenu(false);
+                      setAboutModalTab('about');
                       setShowAboutModal(true);
                     }}
                     className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
@@ -1269,22 +1286,13 @@ export const Dashboard: React.FC = () => {
               className="hidden md:flex items-center gap-2.5 pl-2.5 border-l shrink-0"
               style={{ borderColor: 'var(--border-color)' }}
             >
-              {userProfile?.photoURL ? (
-                <img
-                  src={userProfile.photoURL}
-                  alt={userProfile.displayName || "User"}
-                  referrerPolicy="no-referrer"
-                  className="w-7 h-7 rounded-full object-cover border shrink-0"
-                  style={{ borderColor: 'var(--border-color)' }}
-                />
-              ) : (
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
-                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                >
-                  <UserIcon className="w-3.5 h-3.5" />
-                </div>
-              )}
+              <img
+                src={userAvatarSrc}
+                alt={userProfile?.displayName || "User"}
+                referrerPolicy="no-referrer"
+                className="w-7 h-7 rounded-full object-cover border shrink-0"
+                style={{ borderColor: 'var(--border-color)' }}
+              />
               <div className="text-left max-w-[80px] xl:max-w-[120px] shrink-0">
                 <div className="flex items-center gap-1">
                   <p className="text-xs font-semibold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
@@ -1638,16 +1646,36 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center justify-center gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                 <button
                   type="button"
-                  onClick={() => setShowAboutModal(true)}
+                  id="dashboard-sidebar-about-btn"
+                  onClick={() => {
+                    setAboutModalTab('about');
+                    setNavigatedFromSettings(false);
+                    setShowAboutModal(true);
+                  }}
                   className="hover:underline opacity-80 hover:opacity-100 cursor-pointer"
                 >
-                  About & FAQ
+                  About
                 </button>
                 <span>&bull;</span>
                 <button
                   type="button"
+                  id="dashboard-sidebar-faq-btn"
+                  onClick={() => {
+                    setAboutModalTab('faq');
+                    setNavigatedFromSettings(false);
+                    setShowAboutModal(true);
+                  }}
+                  className="hover:underline opacity-80 hover:opacity-100 cursor-pointer"
+                >
+                  FAQ
+                </button>
+                <span>&bull;</span>
+                <button
+                  type="button"
+                  id="dashboard-sidebar-legal-btn"
                   onClick={() => {
                     setLegalModalTab('privacy');
+                    setNavigatedFromSettings(false);
                     setShowLegalModal(true);
                   }}
                   className="hover:underline opacity-80 hover:opacity-100 cursor-pointer"
@@ -2268,13 +2296,14 @@ export const Dashboard: React.FC = () => {
         defaultTab={settingsDefaultTab}
         onTabChange={(tab) => setSettingsDefaultTab(tab)}
         onClose={() => setShowSettingsModal(false)}
-        onOpenAbout={() => {
+        onOpenAbout={(tab) => {
+          setAboutModalTab(tab || 'about');
           setNavigatedFromSettings(true);
           setShowSettingsModal(false);
           setShowAboutModal(true);
         }}
-        onOpenLegal={() => {
-          setLegalModalTab('privacy');
+        onOpenLegal={(tab) => {
+          setLegalModalTab(tab || 'privacy');
           setNavigatedFromSettings(true);
           setShowSettingsModal(false);
           setShowLegalModal(true);
@@ -2374,6 +2403,7 @@ export const Dashboard: React.FC = () => {
       <ErrorBoundary fallbackTitle="About sanctuary is taking a mindful breath">
         <AboutModal
           isOpen={showAboutModal}
+          initialTab={aboutModalTab}
           onClose={() => {
             setShowAboutModal(false);
             setNavigatedFromSettings(false);

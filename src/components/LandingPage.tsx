@@ -62,6 +62,7 @@ export const LandingPage: React.FC = () => {
 
   // About and Legal modal states for non-logged in users
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [aboutInitialTab, setAboutInitialTab] = useState<'about' | 'faq'>('about');
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalInitialTab, setLegalInitialTab] = useState<'privacy' | 'terms'>('privacy');
 
@@ -997,7 +998,10 @@ export const LandingPage: React.FC = () => {
           <button
             id="landing-footer-about-btn"
             type="button"
-            onClick={() => setIsAboutOpen(true)}
+            onClick={() => {
+              setAboutInitialTab('about');
+              setIsAboutOpen(true);
+            }}
             className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
             style={{
               backgroundColor: 'var(--bg-input)',
@@ -1008,6 +1012,25 @@ export const LandingPage: React.FC = () => {
           >
             <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
             <span>About</span>
+          </button>
+
+          <button
+            id="landing-footer-faq-btn"
+            type="button"
+            onClick={() => {
+              setAboutInitialTab('faq');
+              setIsAboutOpen(true);
+            }}
+            className="text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-secondary)'
+            }}
+            title="Frequently Asked Questions & Safeguards"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+            <span>FAQ</span>
           </button>
 
           <button
@@ -1037,6 +1060,7 @@ export const LandingPage: React.FC = () => {
       {/* About Sanctuary Modal */}
       <AboutModal
         isOpen={isAboutOpen}
+        initialTab={aboutInitialTab}
         onClose={() => setIsAboutOpen(false)}
         onOpenPrivacy={() => {
           setIsAboutOpen(false);
