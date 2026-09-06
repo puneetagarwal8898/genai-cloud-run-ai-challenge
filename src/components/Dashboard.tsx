@@ -2299,7 +2299,11 @@ export const Dashboard: React.FC = () => {
           setSettingsDefaultTab('security');
         }}
         onSuccess={async (secret) => {
-          await enableTwoFactorAuth(secret);
+          try {
+            await enableTwoFactorAuth(secret);
+          } catch (enableErr) {
+            console.warn('2FA activation notice in Dashboard:', enableErr);
+          }
           setShowTwoFactorSetup(false);
           setShowSettingsModal(true);
           setSettingsDefaultTab('security');

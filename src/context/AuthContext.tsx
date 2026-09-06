@@ -263,10 +263,20 @@ async function resolve2FAStatus(email?: string | null, uid?: string | null): Pro
   if (cleanUid) {
     try {
       const creds = getFirebaseCredentialsStatus();
-      if (creds.isConfigured) {
+      if (creds.isConfigured && db) {
         const userDocRef = doc(db, 'users', cleanUid);
-        const userSnap = await getDoc(userDocRef);
-        if (userSnap.exists()) {
+        const queryFirestoreDoc = async () => {
+          try {
+            return await getDoc(userDocRef);
+          } catch {
+            return null;
+          }
+        };
+        // 1200ms safety timeout so slow/unreachable Firestore never hangs auth checks
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
+        const userSnap = await Promise.race([queryFirestoreDoc(), timeoutPromise]);
+
+        if (userSnap && userSnap.exists()) {
           const data = userSnap.data();
           if (data.twoFactorEnabled && data.twoFactorSecret) {
             saveLocal2FARecord({
@@ -659,21 +669,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn("Local accounts sync notice:", e);
     }
 
-    // 5. Cloud Firestore persistence
+    // 5. Cloud Firestore persistence (asynchronous non-blocking background sync with safety timeout)
     try {
       const creds = getFirebaseCredentialsStatus();
-      if (creds.isConfigured && userProfile.uid) {
-        await setDoc(doc(db, 'users', userProfile.uid), sanitizePayload({
-          twoFactorEnabled: true,
-          twoFactorSecret: secret,
-          twoFactorConfiguredAt: configuredAt,
-          email: userProfile.email || null,
-          displayName: userProfile.displayName || null,
-          updatedAt: new Date().toISOString()
-        }), { merge: true });
+      if (creds.isConfigured && userProfile.uid && db) {
+        const syncToFirestore = async () => {
+          try {
+            await setDoc(doc(db, 'users', userProfile.uid), sanitizePayload({
+              twoFactorEnabled: true,
+              twoFactorSecret: secret,
+              twoFactorConfiguredAt: configuredAt,
+              email: userProfile.email || null,
+              displayName: userProfile.displayName || null,
+              updatedAt: new Date().toISOString()
+            }), { merge: true });
+          } catch (fsErr) {
+            console.warn("Firestore 2FA save warning:", fsErr);
+          }
+        };
+        // Non-blocking with 1500ms safety race boundary so slow/offline networks never block UI
+        Promise.race([
+          syncToFirestore(),
+          new Promise((resolve) => setTimeout(resolve, 1500))
+        ]).catch((e) => console.warn('Firestore 2FA sync race notice:', e));
       }
     } catch (fsErr) {
-      console.warn("Firestore 2FA save warning:", fsErr);
+      console.warn("Firestore 2FA save notice:", fsErr);
     }
   };
 
@@ -721,19 +742,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn("Local accounts sync notice:", e);
     }
 
-    // 5. Cloud Firestore persistence
+    // 5. Cloud Firestore persistence (asynchronous non-blocking background sync with safety timeout)
     try {
       const creds = getFirebaseCredentialsStatus();
-      if (creds.isConfigured && userProfile.uid) {
-        await setDoc(doc(db, 'users', userProfile.uid), sanitizePayload({
-          twoFactorEnabled: false,
-          twoFactorSecret: null,
-          twoFactorConfiguredAt: null,
-          updatedAt: new Date().toISOString()
-        }), { merge: true });
+      if (creds.isConfigured && userProfile.uid && db) {
+        const syncToFirestore = async () => {
+          try {
+            await setDoc(doc(db, 'users', userProfile.uid), sanitizePayload({
+              twoFactorEnabled: false,
+              twoFactorSecret: null,
+              twoFactorConfiguredAt: null,
+              updatedAt: new Date().toISOString()
+            }), { merge: true });
+          } catch (fsErr) {
+            console.warn("Firestore 2FA disable warning:", fsErr);
+          }
+        };
+        // Non-blocking with 1500ms safety race boundary
+        Promise.race([
+          syncToFirestore(),
+          new Promise((resolve) => setTimeout(resolve, 1500))
+        ]).catch((e) => console.warn('Firestore 2FA disable sync race notice:', e));
       }
     } catch (fsErr) {
-      console.warn("Firestore 2FA disable warning:", fsErr);
+      console.warn("Firestore 2FA disable notice:", fsErr);
     }
   };
 

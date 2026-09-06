@@ -72,10 +72,16 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
     }
 
     try {
-      await onSuccess(secret);
+      // 3.5-second safety timeout so activation can never hang the UI
+      const activationPromise = Promise.resolve(onSuccess(secret));
+      const timeoutPromise = new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error('Activation took longer than expected. Please check your network and try again.')), 3500)
+      );
+      await Promise.race([activationPromise, timeoutPromise]);
       setIsVerifying(false);
       onClose();
     } catch (err: any) {
+      console.error('2FA activation error:', err);
       setError(err?.message || 'Failed to activate Two-Factor Authentication.');
       setIsVerifying(false);
     }
@@ -91,7 +97,7 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
           backdropFilter: 'blur(8px)'
         }}
         onClick={(e) => {
-          if (e.target === e.currentTarget && !isVerifying) onClose();
+          if (e.target === e.currentTarget) onClose();
         }}
       >
         <motion.div
@@ -132,7 +138,6 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={isVerifying}
               className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
               style={{ backgroundColor: 'var(--bg-card-elevated)', color: 'var(--text-secondary)' }}
               aria-label="Close"
