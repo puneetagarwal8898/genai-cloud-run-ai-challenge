@@ -377,6 +377,71 @@ Return ONLY pure JSON.`;
 });
 
 // Vite middleware & Production static serving
+// Public Privacy Policy & Terms for Google OAuth compliance
+app.get("/privacy", (req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>ReflectAI Sanctuary - Privacy Policy</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1e293b; background: #f8fafc; }
+        .card { background: #ffffff; padding: 40px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        h1 { color: #4338ca; }
+        h2 { color: #334155; margin-top: 24px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>ReflectAI Sanctuary - Privacy Policy</h1>
+        <p><strong>Last Updated:</strong> ${new Date().toISOString().split("T")[0]}</p>
+        <p>ReflectAI Sanctuary ("we", "our", or "the App") is committed to protecting your personal privacy. This privacy policy explains how our application handles your data when you use our reflection and journaling platform.</p>
+        
+        <h2>1. Information We Collect</h2>
+        <p>When you authenticate using Google Sign-In, we receive basic identity information: your email address, display name, and profile picture URL. When you write reflections or journals, this content is stored in your private database account.</p>
+        
+        <h2>2. How We Use Your Information</h2>
+        <p>Your information is used strictly to provide you with private journaling and AI-assisted reflection features. We do not sell, rent, or share your personal information with third parties or advertisers.</p>
+        
+        <h2>3. Data Isolation & Security</h2>
+        <p>All user data is isolated per authenticated user account using Cloud Firestore security rules. Only you can view and edit your journal entries.</p>
+        
+        <h2>4. Contact Us</h2>
+        <p>If you have any questions regarding this Privacy Policy, you can contact the developer at: <strong>puneet.agarwal8898@gmail.com</strong>.</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+app.get("/terms", (req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>ReflectAI Sanctuary - Terms of Service</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1e293b; background: #f8fafc; }
+        .card { background: #ffffff; padding: 40px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        h1 { color: #4338ca; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>ReflectAI Sanctuary - Terms of Service</h1>
+        <p>By using ReflectAI Sanctuary, you agree to use the service for lawful personal journaling and reflection. The AI insights provided are for personal growth and contemplative exploration and do not substitute professional medical, legal, or psychological advice.</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
