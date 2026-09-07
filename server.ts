@@ -350,6 +350,86 @@ app.get("/api/auth/linkedin/callback", async (req, res) => {
   }
 });
 
+// Facebook OAuth 2.0 direct authorization and exchange endpoints
+app.get("/api/auth/facebook/url", (req, res) => {
+  const appId = process.env.FACEBOOK_APP_ID || "";
+  const host = req.get("host") || "reflectai-952579076488.asia-south1.run.app";
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const protocol = isLocal ? "http" : "https";
+  const origin = (req.query.origin as string) || `${protocol}://${host}`;
+  const redirectUri = `${origin}/api/auth/facebook/callback`;
+  const state = Math.random().toString(36).substring(2, 15);
+  
+  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=email,public_profile`;
+  
+  res.json({
+    url: authUrl,
+    redirectUri,
+    appId,
+    isDirectConfigured: Boolean(process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET)
+  });
+});
+
+app.get("/api/auth/facebook/callback", async (req, res) => {
+  const code = req.query.code as string;
+  const error = req.query.error as string;
+  const errorDescription = req.query.error_description as string;
+  const appId = process.env.FACEBOOK_APP_ID || "";
+  const appSecret = process.env.FACEBOOK_APP_SECRET || "";
+  const host = req.get("host") || "reflectai-952579076488.asia-south1.run.app";
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const protocol = isLocal ? "http" : "https";
+  const redirectUri = `${protocol}://${host}/api/auth/facebook/callback`;
+
+  if (error) {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><body><script>if(window.opener){window.opener.postMessage({type:'FACEBOOK_AUTH_ERROR',error:${JSON.stringify(errorDescription || error)}},'*');window.close();}else{window.location.href='/?error='+encodeURIComponent(${JSON.stringify(errorDescription || error)});}</script><p>Facebook Authentication cancelled: ${errorDescription || error}</p></body></html>`);
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send("No authorization code returned from Facebook.");
+    return;
+  }
+
+  try {
+    if (!appSecret || !appId) {
+      throw new Error("FACEBOOK_APP_ID and FACEBOOK_APP_SECRET environment variables are required on Cloud Run for direct token exchange.");
+    }
+
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenData: any = await tokenRes.json();
+    if (!tokenRes.ok || !tokenData.access_token) {
+      throw new Error(tokenData.error?.message || "Failed to exchange code for Facebook access token.");
+    }
+
+    const userRes = await fetch(`https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(tokenData.access_token)}`);
+    const userInfo: any = await userRes.json();
+    if (!userRes.ok || !userInfo.id) {
+      throw new Error(userInfo.error?.message || "Failed to fetch user profile from Facebook Graph API.");
+    }
+
+    const photoURL = userInfo.picture?.data?.url || null;
+    const userProfile = {
+      uid: "facebook_" + userInfo.id,
+      email: userInfo.email || `facebook_${userInfo.id}@facebook.internal`,
+      displayName: userInfo.name || "Facebook Member",
+      photoURL,
+      authProvider: "facebook",
+      emailVerified: Boolean(userInfo.email),
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString()
+    };
+
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><head><title>Facebook Authentication</title></head><body><div style="font-family:sans-serif;text-align:center;padding:40px;"><h3>Authentication Successful</h3><p>Connecting Facebook profile to ReflectAI...</p></div><script>if(window.opener){window.opener.postMessage({type:'FACEBOOK_AUTH_SUCCESS',profile:${JSON.stringify(userProfile)}},'*');setTimeout(()=>window.close(),300);}else{localStorage.setItem('reflectai_session_user',JSON.stringify(${JSON.stringify(userProfile)}));window.location.href='/';}</script></body></html>`);
+  } catch (err: any) {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><body><script>if(window.opener){window.opener.postMessage({type:'FACEBOOK_AUTH_ERROR',error:${JSON.stringify(err.message)}},'*');setTimeout(()=>window.close(),2000);}</script><div style="font-family:sans-serif;padding:30px;color:#b91c1c;"><h3>Facebook Authentication Notice</h3><p>${err.message}</p></div></body></html>`);
+  }
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
