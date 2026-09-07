@@ -369,6 +369,17 @@ export const LandingPage: React.FC = () => {
                     >
                       Test with LinkedIn Profile
                     </button>
+                    <button
+                      type="button"
+                      id="error-linkedin-guide-btn"
+                      onClick={() => {
+                        setGuideProvider('linkedin');
+                        setIsGuideOpen(true);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-[11px] font-medium text-indigo-200 transition cursor-pointer"
+                    >
+                      View Fix &amp; Guide
+                    </button>
                   </div>
                 )}
               </div>

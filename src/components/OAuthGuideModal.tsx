@@ -66,11 +66,11 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
             },
             {
               step: '3. Add Authorized Redirect URLs in LinkedIn',
-              desc: `Go to the "Auth" tab in your LinkedIn app. Under "OAuth 2.0 settings" > "Authorized redirect URLs for your app", add both:\n1) https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler\n2) https://${currentHost}/api/auth/linkedin/callback`
+              desc: `Go to the "Auth" tab in your LinkedIn app. Under "OAuth 2.0 settings" > "Authorized redirect URLs for your app", add:\nhttps://${currentHost}/api/auth/linkedin/callback`
             },
             {
-              step: '4. Direct Backend Token Exchange (Recommended for Cloud Run)',
-              desc: 'Due to a known upstream issue where Firebase Identity Platform sends the client secret via HTTP Basic headers rather than POST form parameters, set LINKEDIN_CLIENT_SECRET on your Cloud Run service to enable flawless direct backend authentication.'
+              step: '4. Direct Token Exchange (Resolves Firebase Upstream Incompatibility)',
+              desc: `Why Firebase fails: Firebase Identity Platform sends secrets in HTTP Basic Authorization headers, but LinkedIn mandates them in the application/x-www-form-urlencoded POST body, causing a persistent 'invalid-credential' error even when keys are 100% correct.\n\nTo activate the direct server-side integration, update your Cloud Run environment variables:\ngcloud run services update reflectai --update-env-vars LINKEDIN_CLIENT_ID="78ryr3nz4fw3p9",LINKEDIN_CLIENT_SECRET="YOUR_LINKEDIN_SECRET" --region=asia-south1`
             }
           ]
         };
