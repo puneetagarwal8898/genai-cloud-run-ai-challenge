@@ -11,6 +11,9 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Trust proxy for Cloud Run ingress routing
+app.set("trust proxy", 1);
+
 // Top-Level Request Deserialization (Ordering Guarantee)
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -258,7 +261,10 @@ app.post("/api/auth/verify-code", (req, res) => {
 // LinkedIn OAuth 2.0 direct authorization and exchange endpoints
 app.get("/api/auth/linkedin/url", (req, res) => {
   const clientId = process.env.LINKEDIN_CLIENT_ID || "78ryr3nz4fw3p9";
-  const origin = (req.query.origin as string) || `${req.protocol}://${req.get("host")}`;
+  const host = req.get("host") || "reflectai-952579076488.asia-south1.run.app";
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const protocol = isLocal ? "http" : "https";
+  const origin = (req.query.origin as string) || `${protocol}://${host}`;
   const redirectUri = `${origin}/api/auth/linkedin/callback`;
   const state = Math.random().toString(36).substring(2, 15);
   
@@ -279,7 +285,8 @@ app.get("/api/auth/linkedin/callback", async (req, res) => {
   const clientId = process.env.LINKEDIN_CLIENT_ID || "78ryr3nz4fw3p9";
   const clientSecret = process.env.LINKEDIN_CLIENT_SECRET || "";
   const host = req.get("host") || "reflectai-952579076488.asia-south1.run.app";
-  const protocol = req.protocol === "http" && !host.includes("localhost") ? "https" : req.protocol;
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const protocol = isLocal ? "http" : "https";
   const redirectUri = `${protocol}://${host}/api/auth/linkedin/callback`;
 
   if (error) {
