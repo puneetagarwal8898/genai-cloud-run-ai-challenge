@@ -255,6 +255,94 @@ app.post("/api/auth/verify-code", (req, res) => {
   }
 });
 
+// LinkedIn OAuth 2.0 direct authorization and exchange endpoints
+app.get("/api/auth/linkedin/url", (req, res) => {
+  const clientId = process.env.LINKEDIN_CLIENT_ID || "78ryr3nz4fw3p9";
+  const origin = (req.query.origin as string) || `${req.protocol}://${req.get("host")}`;
+  const redirectUri = `${origin}/api/auth/linkedin/callback`;
+  const state = Math.random().toString(36).substring(2, 15);
+  
+  const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=openid%20profile%20email`;
+  
+  res.json({
+    url: authUrl,
+    redirectUri,
+    clientId,
+    isDirectConfigured: Boolean(process.env.LINKEDIN_CLIENT_SECRET)
+  });
+});
+
+app.get("/api/auth/linkedin/callback", async (req, res) => {
+  const code = req.query.code as string;
+  const error = req.query.error as string;
+  const errorDescription = req.query.error_description as string;
+  const clientId = process.env.LINKEDIN_CLIENT_ID || "78ryr3nz4fw3p9";
+  const clientSecret = process.env.LINKEDIN_CLIENT_SECRET || "";
+  const host = req.get("host") || "reflectai-952579076488.asia-south1.run.app";
+  const protocol = req.protocol === "http" && !host.includes("localhost") ? "https" : req.protocol;
+  const redirectUri = `${protocol}://${host}/api/auth/linkedin/callback`;
+
+  if (error) {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><body><script>if(window.opener){window.opener.postMessage({type:'LINKEDIN_AUTH_ERROR',error:${JSON.stringify(errorDescription || error)}},'*');window.close();}else{window.location.href='/?error='+encodeURIComponent(${JSON.stringify(errorDescription || error)});}</script><p>Authentication cancelled or failed: ${errorDescription || error}</p></body></html>`);
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send("No authorization code returned from LinkedIn.");
+    return;
+  }
+
+  try {
+    if (!clientSecret) {
+      throw new Error("LINKEDIN_CLIENT_SECRET environment variable is required on Cloud Run to complete server-side token exchange.");
+    }
+
+    const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret
+      })
+    });
+
+    const tokenData: any = await tokenRes.json();
+    if (!tokenRes.ok || !tokenData.access_token) {
+      throw new Error(tokenData.error_description || tokenData.error || "Failed to exchange code for LinkedIn access token.");
+    }
+
+    const userRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+
+    const userInfo: any = await userRes.json();
+    if (!userRes.ok || !userInfo.sub) {
+      throw new Error("Failed to fetch verified user profile from LinkedIn API.");
+    }
+
+    const userProfile = {
+      uid: "linkedin_" + userInfo.sub,
+      email: userInfo.email || `linkedin_${userInfo.sub}@linkedin.com`,
+      displayName: userInfo.name || `${userInfo.given_name || ''} ${userInfo.family_name || ''}`.trim() || "LinkedIn Member",
+      photoURL: userInfo.picture || null,
+      authProvider: "linkedin",
+      emailVerified: Boolean(userInfo.email_verified),
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString()
+    };
+
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><head><title>Authentication Complete</title></head><body><div style="font-family:sans-serif;text-align:center;padding:40px;"><h3>Authentication Successful</h3><p>Connecting your profile to ReflectAI...</p></div><script>if(window.opener){window.opener.postMessage({type:'LINKEDIN_AUTH_SUCCESS',profile:${JSON.stringify(userProfile)}},'*');setTimeout(()=>window.close(),300);}else{localStorage.setItem('reflectai_session_user',JSON.stringify(${JSON.stringify(userProfile)}));window.location.href='/';}</script></body></html>`);
+  } catch (err: any) {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><body><script>if(window.opener){window.opener.postMessage({type:'LINKEDIN_AUTH_ERROR',error:${JSON.stringify(err.message)}},'*');setTimeout(()=>window.close(),2000);}</script><div style="font-family:sans-serif;padding:30px;color:#b91c1c;"><h3>LinkedIn Authentication Notice</h3><p>${err.message}</p></div></body></html>`);
+  }
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
