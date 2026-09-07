@@ -11,6 +11,7 @@ import {
   googleProvider,
   facebookProvider,
   linkedInProvider,
+  linkedInLegacyProvider,
   getFirebaseCredentialsStatus
 } from '../firebase';
 import { UserProfile } from '../types';
@@ -255,7 +256,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const activeAuth = getActiveAuth();
-      const result = await signInWithPopup(activeAuth, linkedInProvider);
+      let result;
+      try {
+        result = await signInWithPopup(activeAuth, linkedInProvider);
+      } catch (firstErr: any) {
+        if (firstErr.code === 'auth/operation-not-allowed' || firstErr.message?.includes('operation-not-allowed') || firstErr.message?.includes('INVALID_IDP_RESPONSE')) {
+          // Attempt with legacy/alternate providerId 'linkedin.com'
+          result = await signInWithPopup(activeAuth, linkedInLegacyProvider);
+        } else {
+          throw firstErr;
+        }
+      }
       const loggedUser = result.user;
       const profile: UserProfile = {
         uid: loggedUser.uid,
