@@ -79,6 +79,10 @@ export const Dashboard: React.FC = () => {
   // Multi-turn conversation trail for active reflection
   const [conversationTrail, setConversationTrail] = useState<Array<{ role: 'user' | 'model'; text: string }>>([]);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+  const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
+
+  // Email verification gate: email auth accounts require emailVerified: true to converse
+  const isEmailUnverified = userProfile?.authProvider === 'email' && !userProfile?.emailVerified;
 
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const currentUserId = user?.uid || userProfile?.uid || '';
@@ -178,6 +182,11 @@ export const Dashboard: React.FC = () => {
   const sendPromptText = async (textToSend: string) => {
     const userEntryText = textToSend.trim();
     if (!userEntryText || isSubmitting) return;
+
+    if (isEmailUnverified) {
+      setShowVerifyModal(true);
+      return;
+    }
 
     // Erase the prompt from textbox immediately
     setPrompt('');
@@ -318,10 +327,18 @@ export const Dashboard: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isEmailUnverified) {
+      setShowVerifyModal(true);
+      return;
+    }
     sendPromptText(prompt);
   };
 
   const handleSuggestedPromptClick = (suggestedText: string) => {
+    if (isEmailUnverified) {
+      setShowVerifyModal(true);
+      return;
+    }
     // Clear suggested prompts immediately so other suggestions vanish
     setSuggestedPrompts([]);
     sendPromptText(suggestedText);
@@ -1058,6 +1075,37 @@ export const Dashboard: React.FC = () => {
               borderColor: 'var(--border-color)'
             }}
           >
+            {isEmailUnverified && (
+              <div
+                id="email-unverified-composer-notice"
+                onClick={() => setShowVerifyModal(true)}
+                className="mb-2.5 p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs transition cursor-pointer hover:opacity-95"
+                style={{
+                  backgroundColor: 'rgba(234, 179, 8, 0.09)',
+                  borderColor: 'rgba(234, 179, 8, 0.28)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-[11px] sm:text-xs">
+                    Conversing with ReflectAI requires email verification.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowVerifyModal(true);
+                  }}
+                  className="px-2 py-0.5 rounded-md text-[10px] font-semibold transition shrink-0 underline cursor-pointer"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  Verify Now
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-2.5">
               <div className="relative group">
                 <div
@@ -1070,7 +1118,11 @@ export const Dashboard: React.FC = () => {
                   <textarea
                     id="reflection-prompt-input"
                     rows={3}
-                    placeholder="Write your reflection here... Press Enter to send, Shift+Enter for a new line."
+                    placeholder={
+                      isEmailUnverified
+                        ? "Please verify your email to converse with ReflectAI... (Click to view verification details)"
+                        : "Write your reflection here... Press Enter to send, Shift+Enter for a new line."
+                    }
                     value={prompt}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -1116,6 +1168,105 @@ export const Dashboard: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Polite Email Verification Gate Modal */}
+      <AnimatePresence>
+        {showVerifyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-md rounded-2xl border p-6 shadow-2xl relative"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+                  style={{
+                    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                    color: '#eab308'
+                  }}
+                >
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Email Verification Required
+                  </h3>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Please confirm your address to converse with ReflectAI
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-secondary)' }}>
+                To safeguard your reflections and maintain account integrity, please verify your email address (<strong>{userProfile?.email}</strong>).
+                Google Firebase has dispatched a confirmation link to your inbox.
+              </p>
+
+              {verificationNotice && (
+                <div className="mb-4 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span>{verificationNotice}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  id="modal-resend-verification-btn"
+                  disabled={isResendingEmail}
+                  onClick={handleResendVerification}
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-xl border text-xs font-medium transition cursor-pointer hover:opacity-85 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  style={{
+                    backgroundColor: 'var(--bg-card-elevated)',
+                    borderColor: 'var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>{isResendingEmail ? 'Sending...' : 'Resend Link'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="modal-check-verification-btn"
+                  disabled={isCheckingEmail}
+                  onClick={async () => {
+                    await handleCheckVerification();
+                    if (userProfile?.emailVerified) {
+                      setShowVerifyModal(false);
+                    }
+                  }}
+                  className="w-full sm:flex-1 px-4 py-2 rounded-xl text-white text-xs font-medium transition cursor-pointer hover:opacity-90 shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    boxShadow: '0 0 12px var(--accent-glow)'
+                  }}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCheckingEmail ? 'animate-spin' : ''}`} />
+                  <span>{isCheckingEmail ? 'Checking...' : "I've Verified My Email"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowVerifyModal(false)}
+                  className="w-full sm:w-auto px-3 py-2 text-xs font-medium transition cursor-pointer hover:opacity-75"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
