@@ -3,7 +3,7 @@ export interface UserProfile {
   email: string;
   displayName?: string | null;
   photoURL?: string | null;
-  authProvider?: 'google' | 'linkedin' | 'facebook' | 'email' | 'demo';
+  authProvider?: 'google' | 'linkedin' | 'twitter' | 'email' | 'demo';
   emailVerified?: boolean;
   createdAt: string;
   lastActiveAt?: string;

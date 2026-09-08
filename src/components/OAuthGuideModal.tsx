@@ -3,7 +3,7 @@ import { X, ExternalLink, Key, CheckCircle, ShieldCheck } from 'lucide-react';
 
 interface OAuthGuideModalProps {
   isOpen: boolean;
-  provider: 'google' | 'linkedin' | 'facebook' | null;
+  provider: 'google' | 'linkedin' | 'twitter' | null;
   onClose: () => void;
   onContinueAsTestProfile?: () => void;
   isTestMode: boolean;
@@ -74,32 +74,32 @@ export const OAuthGuideModal: React.FC<OAuthGuideModalProps> = ({
             }
           ]
         };
-      case 'facebook':
+      case 'twitter':
         return {
-          title: 'Meta / Facebook Login Setup Guide',
-          color: '#1877F2',
+          title: 'Twitter / X OAuth Setup Guide',
+          color: '#0F1419',
           steps: [
             {
-              step: '1. Create App on Meta for Developers',
-              desc: 'Go to Meta for Developers (developers.facebook.com/apps), click "Create App", select use case "Authenticate and request data from users with Facebook Login" (or App Type "Consumer"), and name it "ReflectAI".',
-              link: 'https://developers.facebook.com/apps'
+              step: '1. Open Developer Portal on X (developer.x.com)',
+              desc: 'Log in to developer.x.com/portal with your X account (ensure your account has a verified email and mobile phone number).',
+              link: 'https://developer.x.com/en/portal/dashboard'
             },
             {
-              step: '2. Add Valid OAuth Redirect URIs in Facebook Login',
-              desc: 'In your Meta app dashboard under Facebook Login > Settings, ensure "Client OAuth Login" and "Web OAuth Login" are enabled (YES). Add Valid OAuth Redirect URI: https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler and https://reflectai-952579076488.asia-south1.run.app/api/auth/facebook/callback, then click Save.'
+              step: '2. Configure User Authentication Settings',
+              desc: 'In your App Settings under "User authentication settings", click "Set up". Enable OAuth 1.0a and select Type of App: "Web App, Automated App or Bot". App permissions: "Read".'
             },
             {
-              step: '3. Copy App ID & App Secret from Basic Settings',
-              desc: 'In Meta for Developers, navigate to App settings > Basic. Copy the numeric "App ID" and click "Show" to copy the "App Secret". (Also set Privacy Policy URL to your app URL).'
+              step: '3. Add Callback URI / Redirect URL',
+              desc: `Under "Callback URI / Redirect URL", enter: https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler. For Website URL, enter: https://${currentHost} then click Save.`
             },
             {
-              step: '4. Enable Facebook in Firebase Console (Native)',
-              desc: 'Open Firebase Console > Authentication > Sign-in method, click Facebook, toggle Enable, paste your Meta App ID and App Secret into Firebase, then click Save.',
+              step: '4. Copy API Key & API Secret',
+              desc: 'Under the "Keys and tokens" tab, regenerate or copy the "API Key (Consumer Key)" and "API Secret (Consumer Secret)".'
+            },
+            {
+              step: '5. Enable Twitter in Firebase Console',
+              desc: 'Open Firebase Console > Authentication > Sign-in method, click Twitter, toggle Enable, paste your API Key & API Secret, and click Save.',
               link: 'https://console.firebase.google.com/project/genai-cohort3-ideathon/authentication/providers'
-            },
-            {
-              step: '5. Optional: Direct Cloud Run Secret Setting',
-              desc: 'Alternatively, you can provide FACEBOOK_APP_ID and FACEBOOK_APP_SECRET as Cloud Run environment variables for direct server-side token exchange.'
             }
           ]
         };
