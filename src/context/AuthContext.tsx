@@ -3,7 +3,12 @@ import {
   User,
   signInWithPopup,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import {
   auth,
@@ -36,9 +41,12 @@ interface AuthContextType {
   signInWithGoogle: (isTestEnv?: boolean) => Promise<void>;
   signInWithTwitter: (isTestEnv?: boolean) => Promise<void>;
   signInWithLinkedIn: (isTestEnv?: boolean) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, displayName?: string, isTestEnv?: boolean) => Promise<{ codeSent: boolean; message: string; previewCode?: string }>;
+  signUpWithEmail: (email: string, password: string, displayName?: string, isTestEnv?: boolean) => Promise<{ codeSent: boolean; message: string; previewCode?: string; directSignIn?: boolean }>;
   verifyEmailCode: (email: string, code: string) => Promise<boolean>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  resendFirebaseVerificationEmail: () => Promise<void>;
+  reloadUserVerificationStatus: () => Promise<boolean>;
   resendVerificationCode: (email: string, isTestEnv?: boolean) => Promise<{ codeSent: boolean; message: string; previewCode?: string }>;
   cancelEmailVerification: () => void;
   signInAsDemoUser: () => Promise<void>;
@@ -64,7 +72,7 @@ function hashPassword(password: string): string {
   return 'phash_' + Math.abs(hash).toString(36) + '_' + password.length;
 }
 
-// Generates an authentic 6-digit verification code
+// Generates an authentic verification code
 function generateSixDigitCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -409,7 +417,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     displayName?: string,
     isTestEnv = false
-  ): Promise<{ codeSent: boolean; message: string; previewCode?: string }> => {
+  ): Promise<{ codeSent: boolean; message: string; previewCode?: string; directSignIn?: boolean }> => {
     setError(null);
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !trimmedEmail.includes('@')) {
@@ -422,46 +430,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const assignedDisplayName = (displayName && displayName.trim()) || trimmedEmail.split('@')[0];
     const passwordHash = hashPassword(password);
 
-    // Call server email dispatcher endpoint
-    let serverResponse: any = null;
-    try {
-      const res = await fetch('/api/auth/send-verification-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail, isTestMode: isTestEnv })
-      });
-      serverResponse = await res.json();
-      if (!res.ok && !serverResponse.fallbackToSandbox) {
-        throw new Error(serverResponse.error || 'Failed to dispatch verification email.');
+    // 1. If Firebase is configured, attempt native Firebase Auth registration first
+    const creds = getFirebaseCredentialsStatus();
+    if (creds.isConfigured) {
+      try {
+        const activeAuth = getActiveAuth();
+        const userCred = await createUserWithEmailAndPassword(activeAuth, trimmedEmail, password);
+        if (userCred.user) {
+          await updateProfile(userCred.user, { displayName: assignedDisplayName }).catch(() => {});
+          // Dispatch verification email via Firebase (Google's infrastructure)
+          await sendEmailVerification(userCred.user).catch((err) => {
+            console.warn("Firebase email verification dispatch notice:", err.message);
+          });
+
+          const profile: UserProfile = {
+            uid: userCred.user.uid,
+            email: userCred.user.email || trimmedEmail,
+            displayName: assignedDisplayName,
+            photoURL: null,
+            authProvider: 'email',
+            emailVerified: userCred.user.emailVerified,
+            createdAt: userCred.user.metadata.creationTime || new Date().toISOString(),
+            lastActiveAt: new Date().toISOString()
+          };
+
+          // Save account in local cache for offline/session resilience
+          const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+          const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
+          accounts[trimmedEmail] = { profile, passwordHash };
+          localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+
+          saveActiveSession(profile);
+          return {
+            codeSent: false,
+            directSignIn: true,
+            message: `Account created successfully! Signed in as ${assignedDisplayName}.`
+          };
+        }
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/email-already-in-use') {
+          throw new Error(`An account already exists for ${trimmedEmail}. Please switch to the Email Login tab to sign in.`);
+        } else if (fbErr.code === 'auth/weak-password') {
+          throw new Error('Password must be at least 6 characters.');
+        } else if (fbErr.code === 'auth/operation-not-allowed') {
+          throw new Error('To enable Email Sign-Up: Open Firebase Console > Authentication > Sign-in method, click "Email/Password", toggle "Enable", and click "Save".');
+        } else {
+          throw new Error(fbErr.message || 'Failed to create account.');
+        }
       }
-    } catch (apiErr: any) {
-      if (!isTestEnv) {
-        throw apiErr;
-      }
-      // In sandbox mode fallback gracefully
-      console.warn("Email API sandbox notice:", apiErr.message);
     }
 
-    const previewCode = serverResponse?.previewCode || generateSixDigitCode();
-    const emailSent = serverResponse?.emailSent === true;
-
-    const pendingData: PendingVerification = {
+    // Local / Sandbox fallback when Firebase is not configured
+    const profile: UserProfile = {
+      uid: 'local_user_' + Math.random().toString(36).substring(2, 9),
       email: trimmedEmail,
-      code: previewCode,
       displayName: assignedDisplayName,
-      passwordHash,
-      previewCode,
-      emailSent,
-      expiresAt: Date.now() + 10 * 60 * 1000 // 10 mins
+      photoURL: null,
+      authProvider: 'email',
+      emailVerified: false,
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString()
     };
 
-    localStorage.setItem(LOCAL_STORAGE_PENDING_KEY, JSON.stringify(pendingData));
-    setPendingVerification(pendingData);
+    const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+    const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
+    accounts[trimmedEmail] = { profile, passwordHash };
+    localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
 
+    saveActiveSession(profile);
     return {
-      codeSent: true,
-      message: serverResponse?.message || `Verification code prepared for ${trimmedEmail}.`,
-      previewCode
+      codeSent: false,
+      directSignIn: true,
+      message: `Account created successfully! Signed in as ${assignedDisplayName}.`
     };
   };
 
@@ -479,7 +519,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (Date.now() > pending.expiresAt) {
-      throw new Error('Verification code expired. Please request a new 6-digit code.');
+      throw new Error('Verification code expired. Please request a new code.');
     }
 
     // Call server to verify code
@@ -498,7 +538,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (pending.code && pending.code === enteredCode.trim()) {
           verified = true;
         } else {
-          throw new Error(data.error || 'Invalid 6-digit verification code.');
+          throw new Error(data.error || 'Invalid verification code.');
         }
       }
     } catch (netErr: any) {
@@ -510,14 +550,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!verified) {
-      throw new Error('Invalid 6-digit verification code. Please check and try again.');
+      throw new Error('Invalid verification code. Please check and try again.');
     }
 
     // Code verified! Register the verified account
     const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
     const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
 
-    // Stable UID derived from email so logging out and in always restores identical chats!
+    // Stable UID derived from email so logging out and in always restores identical chats
     const stableUid = 'usr_' + btoa(pending.email).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
 
     const newProfile: UserProfile = {
@@ -594,12 +634,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithEmail = async (email: string, password: string) => {
     setError(null);
     const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+    if (!password) {
+      throw new Error('Please enter your password.');
+    }
+
+    // 1. If Firebase is configured, authenticate via Firebase Authentication
+    const creds = getFirebaseCredentialsStatus();
+    if (creds.isConfigured) {
+      try {
+        const activeAuth = getActiveAuth();
+        const userCred = await signInWithEmailAndPassword(activeAuth, trimmedEmail, password);
+        const fbUser = userCred.user;
+        const profile: UserProfile = {
+          uid: fbUser.uid,
+          email: fbUser.email || trimmedEmail,
+          displayName: fbUser.displayName || trimmedEmail.split('@')[0],
+          photoURL: fbUser.photoURL || null,
+          authProvider: 'email',
+          emailVerified: fbUser.emailVerified,
+          createdAt: fbUser.metadata.creationTime || new Date().toISOString(),
+          lastActiveAt: new Date().toISOString()
+        };
+        saveActiveSession(profile);
+        return;
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/operation-not-allowed') {
+          throw new Error('Email/Password provider is not enabled in Firebase Console. Go to Firebase Console > Authentication > Sign-in method, click "Email/Password", toggle "Enable", and click "Save".');
+        } else if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential' || fbErr.code === 'auth/wrong-password') {
+          // Check local registered accounts fallback before failing
+          const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+          const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
+          if (accounts[trimmedEmail] && accounts[trimmedEmail].passwordHash === hashPassword(password)) {
+            saveActiveSession(accounts[trimmedEmail].profile);
+            return;
+          }
+          throw new Error('Invalid email or password. Please verify your credentials or create an account.');
+        } else if (fbErr.code === 'auth/too-many-requests') {
+          throw new Error('Access temporarily disabled due to multiple failed login attempts. Please wait a few minutes or reset your password.');
+        } else {
+          // Check local registered accounts fallback
+          const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+          const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
+          if (accounts[trimmedEmail] && accounts[trimmedEmail].passwordHash === hashPassword(password)) {
+            saveActiveSession(accounts[trimmedEmail].profile);
+            return;
+          }
+          throw new Error(fbErr.message || 'Email sign-in failed.');
+        }
+      }
+    }
+
+    // 2. Local accounts fallback (when Firebase is not configured)
     const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
     const accounts: Record<string, any> = accountsRaw ? JSON.parse(accountsRaw) : {};
 
     const account = accounts[trimmedEmail];
     if (!account) {
-      throw new Error('No account found with this email. Please sign up to verify your account.');
+      throw new Error('No account found with this email. Please sign up to create your account.');
     }
 
     if (account.passwordHash !== hashPassword(password)) {
@@ -607,6 +701,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     saveActiveSession(account.profile);
+  };
+
+  const resetPassword = async (email: string) => {
+    setError(null);
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+    const creds = getFirebaseCredentialsStatus();
+    if (creds.isConfigured) {
+      try {
+        const activeAuth = getActiveAuth();
+        await sendPasswordResetEmail(activeAuth, trimmedEmail);
+      } catch (err: any) {
+        if (err.code === 'auth/user-not-found') {
+          throw new Error('No registered account found with this email address.');
+        } else if (err.code === 'auth/operation-not-allowed') {
+          throw new Error('Email/Password provider is not enabled in Firebase Console. Please enable it in Firebase Console > Authentication > Sign-in method.');
+        }
+        throw new Error(err.message || 'Failed to dispatch password reset email.');
+      }
+    } else {
+      throw new Error('Firebase Authentication is not configured for password resets.');
+    }
+  };
+
+  const resendFirebaseVerificationEmail = async (): Promise<void> => {
+    setError(null);
+    const creds = getFirebaseCredentialsStatus();
+    if (creds.isConfigured) {
+      try {
+        const activeAuth = getActiveAuth();
+        if (activeAuth.currentUser) {
+          await sendEmailVerification(activeAuth.currentUser);
+        } else {
+          throw new Error('No active user found to resend verification email.');
+        }
+      } catch (err: any) {
+        if (err.code === 'auth/too-many-requests') {
+          throw new Error('Verification email was sent recently. Please wait a minute before requesting another.');
+        }
+        throw new Error(err.message || 'Failed to resend verification email.');
+      }
+    } else {
+      throw new Error('Firebase Authentication is not configured.');
+    }
+  };
+
+  const reloadUserVerificationStatus = async (): Promise<boolean> => {
+    try {
+      const creds = getFirebaseCredentialsStatus();
+      if (creds.isConfigured) {
+        const activeAuth = getActiveAuth();
+        if (activeAuth.currentUser) {
+          await activeAuth.currentUser.reload();
+          const verified = activeAuth.currentUser.emailVerified;
+          if (userProfile) {
+            const updatedProfile = { ...userProfile, emailVerified: verified };
+            setUserProfile(updatedProfile);
+            localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(updatedProfile));
+          }
+          return verified;
+        }
+      }
+      return userProfile?.emailVerified || false;
+    } catch (err: any) {
+      console.warn('Failed to refresh verification status:', err);
+      return false;
+    }
   };
 
   // Demo user for testing and developer preview only
@@ -660,6 +823,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUpWithEmail,
         verifyEmailCode,
         signInWithEmail,
+        resetPassword,
+        resendFirebaseVerificationEmail,
+        reloadUserVerificationStatus,
         resendVerificationCode,
         cancelEmailVerification,
         signInAsDemoUser,
