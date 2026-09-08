@@ -14,7 +14,7 @@ import {
   linkedInLegacyProvider,
   getFirebaseCredentialsStatus
 } from '../firebase';
-import { UserProfile } from '../types';
+import { AuthProviderType, UserProfile } from '../types';
 
 export interface PendingVerification {
   email: string;
@@ -32,6 +32,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   pendingVerification: PendingVerification | null;
+  lastUsedProvider: AuthProviderType | null;
   signInWithGoogle: (isTestEnv?: boolean) => Promise<void>;
   signInWithTwitter: (isTestEnv?: boolean) => Promise<void>;
   signInWithLinkedIn: (isTestEnv?: boolean) => Promise<void>;
@@ -50,6 +51,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const LOCAL_STORAGE_USER_KEY = 'reflectai_active_user';
 const LOCAL_STORAGE_ACCOUNTS_KEY = 'reflectai_registered_accounts';
 const LOCAL_STORAGE_PENDING_KEY = 'reflectai_pending_verification';
+const LOCAL_STORAGE_LAST_PROVIDER_KEY = 'reflectai_last_login_provider';
 
 // Simple fast SHA-256 equivalent / obfuscation for local credential verification
 function hashPassword(password: string): string {
@@ -93,6 +95,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState<{ email: string; demoCode: string } | null>(null);
+  const [lastUsedProvider, setLastUsedProvider] = useState<AuthProviderType | null>(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
+      if (stored === 'google' || stored === 'linkedin' || stored === 'twitter' || stored === 'email') {
+        return stored;
+      }
+    } catch {
+      // safe fallback
+    }
+    return null;
+  });
 
   useEffect(() => {
     // 1. Check local session first
@@ -116,17 +129,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe = onAuthStateChanged(activeAuth, (currentUser) => {
         setUser(currentUser);
         if (currentUser) {
+          const provId = currentUser.providerData?.[0]?.providerId || '';
+          let detectedProvider: AuthProviderType = 'google';
+          if (provId.includes('twitter')) detectedProvider = 'twitter';
+          else if (provId.includes('linkedin')) detectedProvider = 'linkedin';
+          else if (provId.includes('password')) detectedProvider = 'email';
+
           const profile: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || `${currentUser.uid}@reflectai.internal`,
             displayName: currentUser.displayName || 'Reflective Mind',
             photoURL: currentUser.photoURL || null,
-            authProvider: 'google',
+            authProvider: detectedProvider,
             emailVerified: currentUser.emailVerified,
             createdAt: currentUser.metadata.creationTime || new Date().toISOString(),
             lastActiveAt: new Date().toISOString()
           };
           setUserProfile(profile);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_LAST_PROVIDER_KEY, detectedProvider);
+            setLastUsedProvider(detectedProvider);
+          } catch {
+            // safe fallback
+          }
         } else {
           // Only clear if no local user active
           if (!localStorage.getItem(LOCAL_STORAGE_USER_KEY)) {
@@ -162,6 +187,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const saveActiveSession = (profile: UserProfile) => {
     localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
+    if (profile.authProvider && profile.authProvider !== 'demo') {
+      const p = profile.authProvider as AuthProviderType;
+      if (['google', 'linkedin', 'twitter', 'email'].includes(p)) {
+        try {
+          localStorage.setItem(LOCAL_STORAGE_LAST_PROVIDER_KEY, p);
+          setLastUsedProvider(p);
+        } catch {
+          // safe fallback
+        }
+      }
+    }
     setUserProfile(profile);
     setUser(createMockUser(profile));
   };
@@ -617,6 +653,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         pendingVerification,
+        lastUsedProvider,
         signInWithGoogle,
         signInWithTwitter,
         signInWithLinkedIn,

@@ -464,11 +464,8 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
             <div className="hidden md:block text-left">
-              <p className="text-xs font-semibold leading-tight truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-xs font-semibold leading-tight truncate max-w-[150px]" style={{ color: 'var(--text-primary)' }}>
                 {userProfile?.displayName || "Reflector"}
-              </p>
-              <p className="text-[10px] truncate max-w-[120px]" style={{ color: 'var(--text-muted)' }}>
-                {userProfile?.email}
               </p>
             </div>
           </div>
