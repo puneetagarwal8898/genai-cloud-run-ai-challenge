@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, FileText, Lock, Trash2, CheckCircle2 } from 'lucide-react';
-import { InfoTooltip } from './InfoTooltip';
 
 interface LegalModalProps {
   isOpen: boolean;
@@ -72,7 +71,6 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 <span>Terms of Service</span>
               </button>
             </div>
-            <InfoTooltip text="Our clear, honest commitments to protecting your personal thoughts and maintaining your ownership." />
           </div>
 
           <button
