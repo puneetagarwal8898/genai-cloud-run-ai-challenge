@@ -12,7 +12,8 @@ import {
   RefreshCw,
   AlertCircle,
   FlaskConical,
-  CheckCircle
+  CheckCircle,
+  UserPlus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -282,6 +283,30 @@ export const LandingPage: React.FC = () => {
               <div>
                 <p className="font-semibold text-red-300">Notice</p>
                 <p className="mt-0.5 text-red-200/90 leading-relaxed text-xs">{displayError}</p>
+
+                {/* Account doesn't exist prompt with quick create account button */}
+                {(displayError.toLowerCase().includes("doesn't exist") ||
+                  displayError.toLowerCase().includes("create an account") ||
+                  displayError.toLowerCase().includes("no account found")) && (
+                  <div className="mt-2.5">
+                    <button
+                      type="button"
+                      id="error-create-account-btn"
+                      onClick={() => {
+                        setAuthMode('email_signup');
+                        setLocalError(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition shadow-sm cursor-pointer hover:opacity-90"
+                      style={{
+                        backgroundColor: 'var(--accent)',
+                        boxShadow: '0 0 10px var(--accent-glow)'
+                      }}
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Create an Account</span>
+                    </button>
+                  </div>
+                )}
                 {/* Action chips only shown in test mode */}
                 {appEnv === 'test' && (displayError.includes('LinkedIn') || displayError.includes('Twitter') || displayError.includes('X ')) && (
                   <div className="mt-2.5 flex flex-wrap gap-2">

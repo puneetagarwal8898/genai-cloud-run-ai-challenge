@@ -21,7 +21,7 @@ import {
   getFirebaseCredentialsStatus
 } from '../firebase';
 import { AuthProviderType, UserProfile, UserPreferences } from '../types';
-import { wipeAllUserData } from '../services/journalService';
+import { wipeAllUserData, archiveAndWipeUserData } from '../services/journalService';
 
 export interface PendingVerification {
   email: string;
@@ -434,6 +434,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const assignedDisplayName = (displayName && displayName.trim()) || trimmedEmail.split('@')[0];
     const passwordHash = hashPassword(password);
 
+    // Clear out any tombstone / deleted account record for this email
+    try {
+      const deletedRaw = localStorage.getItem('reflectai_deleted_accounts');
+      if (deletedRaw) {
+        const deletedMap = JSON.parse(deletedRaw);
+        delete deletedMap[trimmedEmail];
+        localStorage.setItem('reflectai_deleted_accounts', JSON.stringify(deletedMap));
+      }
+    } catch {}
+
     // 1. If Firebase is configured, attempt native Firebase Auth registration first
     const creds = getFirebaseCredentialsStatus();
     if (creds.isConfigured) {
@@ -645,6 +655,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Please enter your password.');
     }
 
+    // 0. Check if account was deleted / archived for GDPR
+    try {
+      const deletedRaw = localStorage.getItem('reflectai_deleted_accounts');
+      if (deletedRaw) {
+        const deletedMap = JSON.parse(deletedRaw);
+        if (deletedMap[trimmedEmail]) {
+          throw new Error("This account doesn't exist. Please create an account to get started.");
+        }
+      }
+    } catch (e: any) {
+      if (e.message?.includes("This account doesn't exist")) throw e;
+    }
+
     // 1. If Firebase is configured, authenticate via Firebase Authentication
     const creds = getFirebaseCredentialsStatus();
     if (creds.isConfigured) {
@@ -675,7 +698,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             saveActiveSession(accounts[trimmedEmail].profile);
             return;
           }
-          throw new Error('Invalid email or password. Please verify your credentials or create an account.');
+          throw new Error("This account doesn't exist. Please create an account to get started.");
         } else if (fbErr.code === 'auth/too-many-requests') {
           throw new Error('Access temporarily disabled due to multiple failed login attempts. Please wait a few minutes or reset your password.');
         } else {
@@ -686,7 +709,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             saveActiveSession(accounts[trimmedEmail].profile);
             return;
           }
-          throw new Error(fbErr.message || 'Email sign-in failed.');
+          throw new Error("This account doesn't exist. Please create an account to get started.");
         }
       }
     }
@@ -697,7 +720,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const account = accounts[trimmedEmail];
     if (!account) {
-      throw new Error('No account found with this email. Please sign up to create your account.');
+      throw new Error("This account doesn't exist. Please create an account to get started.");
     }
 
     if (account.passwordHash !== hashPassword(password)) {
@@ -866,34 +889,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!targetUid) {
       throw new Error("No active user session found to delete.");
     }
+    const targetEmail = (userProfile?.email || user?.email || '').trim().toLowerCase();
 
-    // 1. Wipe all personal interactions and profile data from Cloud Firestore & local storage
-    await wipeAllUserData(targetUid);
+    // 1. Archive personal data for GDPR compliance and wipe local + cloud storage
+    try {
+      await archiveAndWipeUserData(targetUid, targetEmail, userProfile);
+    } catch (archiveErr) {
+      console.warn("GDPR archive note:", archiveErr);
+      await wipeAllUserData(targetUid);
+    }
 
-    // 2. Remove from local accounts registry if email provider
+    // 2. Remove account record from local accounts registry
     try {
       const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
-      if (accountsRaw && userProfile?.email) {
+      if (accountsRaw && targetEmail) {
         const accounts = JSON.parse(accountsRaw);
-        delete accounts[userProfile.email.toLowerCase()];
+        delete accounts[targetEmail];
         localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
       }
     } catch (e) {
       console.warn("Accounts registry clean note:", e);
     }
 
-    // 3. Delete Firebase Auth account
+    // 3. Register email in deleted accounts store to prevent subsequent logins
+    if (targetEmail) {
+      try {
+        const deletedRaw = localStorage.getItem('reflectai_deleted_accounts');
+        const deletedMap = deletedRaw ? JSON.parse(deletedRaw) : {};
+        deletedMap[targetEmail] = {
+          deletedAt: new Date().toISOString(),
+          reason: 'User GDPR erasure'
+        };
+        localStorage.setItem('reflectai_deleted_accounts', JSON.stringify(deletedMap));
+      } catch (delRegErr) {
+        console.warn("Deleted account registration note:", delRegErr);
+      }
+    }
+
+    // 4. Safely delete Firebase Auth user with a timeout, and ALWAYS sign out
     try {
       const activeAuth = getActiveAuth();
       if (activeAuth.currentUser) {
-        await deleteUser(activeAuth.currentUser);
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('deleteUser timeout')), 2000)
+          );
+          await Promise.race([deleteUser(activeAuth.currentUser), timeoutPromise]);
+        } catch (delAuthErr: any) {
+          console.warn("Firebase Auth deleteUser note (may require recent login or offline):", delAuthErr.message);
+        }
       }
+      await firebaseSignOut(activeAuth).catch(() => {});
     } catch (authErr: any) {
-      console.warn("Firebase Auth deleteUser note (may require recent login):", authErr.message);
+      console.warn("Firebase Auth cleanup note:", authErr.message);
     }
 
-    // 4. Wipe session and reset state
+    // 5. Purge all session keys from localStorage & sessionStorage
     localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_LAST_PROVIDER_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_PENDING_KEY);
+    try {
+      sessionStorage.clear();
+    } catch {}
+
+    // 6. Reset state to bring user to the landing / login screen
     setUser(null);
     setUserProfile(null);
   };
