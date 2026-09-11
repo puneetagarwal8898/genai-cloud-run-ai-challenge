@@ -15,8 +15,10 @@ export interface SanctuaryLocation {
 
 export interface TimeCapsuleData {
   isSealed: boolean;
+  isOpened?: boolean;
   sealDate: string;
   unlockDate: string;
+  openedDate?: string;
   capsulePrompt?: string;
   growthSummary?: string;
   celebrationText?: string;
@@ -25,7 +27,9 @@ export interface TimeCapsuleData {
 export interface UserPreferences {
   voicePitch?: number;
   voiceRate?: number;
+  voiceSpeed?: number;
   ambientSound?: boolean;
+  ambientSoundEnabled?: boolean;
   autoReadAloud?: boolean;
   avatarSeed?: string;
 }
@@ -35,6 +39,7 @@ export interface UserProfile {
   email: string;
   displayName?: string | null;
   photoURL?: string | null;
+  avatarUrl?: string | null;
   authProvider?: AuthProviderType | 'demo';
   emailVerified?: boolean;
   createdAt: string;

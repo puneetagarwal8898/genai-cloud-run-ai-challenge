@@ -1,20 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
   Compass,
   Sparkles,
-  Calendar,
-  Filter,
-  Eye,
+  ChevronRight,
   Heart,
-  Brain,
   Sun,
-  Shield,
   Activity,
-  ChevronRight
+  Smile,
+  Zap
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { JournalInteraction, SanctuaryMood } from '../types';
+import { InfoTooltip } from './InfoTooltip';
 
 interface ResonanceMapModalProps {
   isOpen: boolean;
@@ -23,61 +21,46 @@ interface ResonanceMapModalProps {
   onSelectInteraction: (interaction: JournalInteraction) => void;
 }
 
-const MOOD_CONFIG: Record<SanctuaryMood, { label: string; color: string; bgLight: string; bgDark: string; border: string; icon: any }> = {
+interface MoodConfig {
+  label: string;
+  color: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const MOOD_CONFIG: Record<SanctuaryMood, MoodConfig> = {
   calm: {
-    label: 'Calm & Grounded',
-    color: '#0284c7', // Sky blue
-    bgLight: 'bg-sky-50 text-sky-700',
-    bgDark: 'dark:bg-sky-950/40 dark:text-sky-300',
-    border: 'border-sky-300 dark:border-sky-700',
-    icon: Shield
+    label: 'Calm & Peace',
+    color: '#0ea5e9',
+    icon: Sparkles
   },
   clarity: {
-    label: 'Clarity & Focus',
-    color: '#0d9488', // Teal
-    bgLight: 'bg-teal-50 text-teal-700',
-    bgDark: 'dark:bg-teal-950/40 dark:text-teal-300',
-    border: 'border-teal-300 dark:border-teal-700',
-    icon: Brain
+    label: 'Mental Clarity',
+    color: '#06b6d4',
+    icon: Zap
   },
   gratitude: {
-    label: 'Gratitude & Warmth',
-    color: '#d97706', // Amber
-    bgLight: 'bg-amber-50 text-amber-700',
-    bgDark: 'dark:bg-amber-950/40 dark:text-amber-300',
-    border: 'border-amber-300 dark:border-amber-700',
+    label: 'Gratitude & Joy',
+    color: '#f59e0b',
     icon: Heart
   },
   courage: {
     label: 'Courage & Strength',
-    color: '#dc2626', // Coral red
-    bgLight: 'bg-rose-50 text-rose-700',
-    bgDark: 'dark:bg-rose-950/40 dark:text-rose-300',
-    border: 'border-rose-300 dark:border-rose-700',
+    color: '#ef4444',
     icon: Sun
   },
   growth: {
-    label: 'Growth & Evolution',
-    color: '#16a34a', // Emerald
-    bgLight: 'bg-emerald-50 text-emerald-700',
-    bgDark: 'dark:bg-emerald-950/40 dark:text-emerald-300',
-    border: 'border-emerald-300 dark:border-emerald-700',
-    icon: Sparkles
+    label: 'Growth & Progress',
+    color: '#10b981',
+    icon: Smile
   },
   anxious: {
-    label: 'Tension & Release',
-    color: '#9333ea', // Purple
-    bgLight: 'bg-purple-50 text-purple-700',
-    bgDark: 'dark:bg-purple-950/40 dark:text-purple-300',
-    border: 'border-purple-300 dark:border-purple-700',
+    label: 'Unburdening',
+    color: '#a855f7',
     icon: Activity
   },
   reflective: {
-    label: 'Deep Contemplation',
-    color: '#4f46e5', // Indigo
-    bgLight: 'bg-indigo-50 text-indigo-700',
-    bgDark: 'dark:bg-indigo-950/40 dark:text-indigo-300',
-    border: 'border-indigo-300 dark:border-indigo-700',
+    label: 'Contemplation',
+    color: '#6366f1',
     icon: Compass
   }
 };
@@ -113,66 +96,103 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
     });
 
     const total = interactions.length || 1;
-    return Object.entries(counts).map(([mood, count]) => ({
-      mood: mood as SanctuaryMood,
-      count,
-      percentage: Math.round((count / total) * 100)
+    return (Object.keys(counts) as SanctuaryMood[]).map((mood) => ({
+      mood,
+      count: counts[mood],
+      percentage: Math.round((counts[mood] / total) * 100)
     }));
   }, [interactions]);
 
   const filteredInteractions = useMemo(() => {
     if (activeMoodFilter === 'all') return interactions;
-    return interactions.filter((item) => (item.mood || 'reflective') === activeMoodFilter);
+    return interactions.filter(
+      (item) => (item.mood || 'reflective') === activeMoodFilter
+    );
   }, [interactions, activeMoodFilter]);
 
   if (!isOpen) return null;
 
   return (
-    <div id="resonance-map-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto">
+    <div
+      id="resonance-map-backdrop"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(6px)' }}
+    >
       <motion.div
         id="resonance-map-content"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-4xl bg-stone-900 border border-stone-800 text-stone-100 rounded-3xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[90vh]"
+        className="w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden my-4 flex flex-col max-h-[90vh]"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-color)',
+          color: 'var(--text-primary)'
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-800 bg-stone-950/40">
+        <div
+          className="flex items-center justify-between px-5 py-4 border-b shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-card-elevated)',
+            borderColor: 'var(--border-color)'
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
-              <Compass className="w-5 h-5 animate-pulse" />
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: 'var(--accent-light)',
+                color: 'var(--accent)'
+              }}
+            >
+              <Compass className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold font-serif tracking-tight text-white flex items-center gap-2">
-                Echoes of Mind: Emotional Topology
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  Resonance Map
-                </span>
-              </h2>
-              <p className="text-xs text-stone-400">
-                A living constellation of your thoughts, emotional undertones, and mental landmarks
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base sm:text-lg font-semibold tracking-tight font-serif">
+                  Echoes of Mind &bull; Thought Constellation
+                </h2>
+                <InfoTooltip text="A sky map of your thoughts. Each thought is placed like a gentle star based on how you felt when writing (such as Calm, Gratitude, or Courage)." />
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                A visual constellation of your reflections and feelings over time
               </p>
             </div>
           </div>
           <button
             id="resonance-map-close-button"
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800 transition-colors"
+            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--text-secondary)'
+            }}
+            aria-label="Close thought map"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Distribution Summary Ribbon */}
-        <div className="px-6 py-3 border-b border-stone-800 bg-stone-900/50 overflow-x-auto flex items-center gap-2">
+        {/* Filter Ribbon */}
+        <div
+          className="px-5 py-2.5 border-b overflow-x-auto flex items-center gap-2 shrink-0 custom-scrollbar"
+          style={{
+            backgroundColor: 'var(--bg-card-elevated)',
+            borderColor: 'var(--border-color)'
+          }}
+        >
           <button
             type="button"
             onClick={() => setActiveMoodFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-              activeMoodFilter === 'all'
-                ? 'bg-stone-100 text-stone-900 shadow-sm'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer whitespace-nowrap border ${
+              activeMoodFilter === 'all' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
             }`}
+            style={{
+              backgroundColor: activeMoodFilter === 'all' ? 'var(--accent)' : 'transparent',
+              borderColor: activeMoodFilter === 'all' ? 'var(--accent)' : 'var(--border-color)',
+              color: activeMoodFilter === 'all' ? '#ffffff' : 'var(--text-secondary)'
+            }}
           >
             All Reflections ({interactions.length})
           </button>
@@ -185,19 +205,22 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                 key={item.mood}
                 type="button"
                 onClick={() => setActiveMoodFilter(item.mood)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap border ${
-                  isSelected
-                    ? 'border-indigo-400 bg-indigo-950/60 text-indigo-200'
-                    : 'border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300'
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap border ${
+                  isSelected ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
                 }`}
+                style={{
+                  backgroundColor: isSelected ? 'var(--accent-light)' : 'transparent',
+                  borderColor: isSelected ? 'var(--accent)' : 'var(--border-color)',
+                  color: isSelected ? 'var(--accent)' : 'var(--text-secondary)'
+                }}
               >
                 <span
-                  className="w-2 h-2 rounded-full"
+                  className="w-2 h-2 rounded-full shrink-0"
                   style={{ backgroundColor: cfg.color }}
                 />
-                <Icon className="w-3 h-3" />
+                <Icon className="w-3 h-3 shrink-0" />
                 <span>{cfg.label.split(' ')[0]}</span>
-                <span className="text-[10px] opacity-60 font-mono">
+                <span className="text-[10px] opacity-70">
                   {item.percentage}%
                 </span>
               </button>
@@ -205,31 +228,37 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
           })}
         </div>
 
-        {/* Main Canvas / Grid Area */}
-        <div className="flex-1 p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Interactive Topology Constellation Preview (2 Cols) */}
+        {/* Main Area */}
+        <div className="flex-1 p-5 sm:p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-5 custom-scrollbar">
+          {/* Constellation Preview */}
           <div className="md:col-span-2 space-y-4">
-            <div className="relative rounded-2xl border border-stone-800 bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 p-6 min-h-[340px] flex flex-col justify-between overflow-hidden shadow-inner">
-              {/* Background ambient grid ripples */}
-              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
-
+            <div
+              className="relative rounded-2xl border p-5 min-h-[320px] flex flex-col justify-between overflow-hidden"
+              style={{
+                backgroundColor: 'var(--bg-canvas)',
+                borderColor: 'var(--border-color)'
+              }}
+            >
               <div className="relative z-10 flex justify-between items-start">
-                <span className="text-xs font-mono text-stone-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  Emotional Resonance Field
-                </span>
-                <span className="text-[11px] text-stone-500 font-mono">
-                  Showing {filteredInteractions.length} nodes
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                    <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                    Thought Stars
+                  </span>
+                  <InfoTooltip text="Click on any thought star to see what you wrote and revisit your reflection." />
+                </div>
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Showing {filteredInteractions.length} reflections
                 </span>
               </div>
 
-              {/* Plotted Constellation Nodes */}
+              {/* Nodes Grid */}
               {filteredInteractions.length === 0 ? (
-                <div className="text-center py-16 text-stone-500 text-sm">
-                  No reflection nodes recorded in this emotional realm yet.
+                <div className="text-center py-16 text-sm" style={{ color: 'var(--text-muted)' }}>
+                  No reflections recorded in this feeling category yet.
                 </div>
               ) : (
-                <div className="relative z-10 grid grid-cols-3 sm:grid-cols-4 gap-3 my-4">
+                <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-4">
                   {filteredInteractions.slice(0, 16).map((interaction, idx) => {
                     const mood = (interaction.mood || 'reflective') as SanctuaryMood;
                     const cfg = MOOD_CONFIG[mood] || MOOD_CONFIG.reflective;
@@ -238,23 +267,26 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                     return (
                       <motion.button
                         key={interaction.id || idx}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.96 }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
                         onClick={() => setSelectedNode(interaction)}
-                        className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden group ${
-                          isSelected
-                            ? 'border-indigo-400 ring-2 ring-indigo-500/30 bg-stone-800'
-                            : 'border-stone-800 bg-stone-900/80 hover:border-stone-700'
+                        className={`p-3 rounded-xl border text-left transition cursor-pointer relative ${
+                          isSelected ? 'shadow-md ring-2 ring-offset-1' : 'opacity-85 hover:opacity-100'
                         }`}
+                        style={{
+                          backgroundColor: 'var(--bg-card-elevated)',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border-color)',
+                          color: 'var(--text-primary)'
+                        }}
                       >
                         <div
-                          className="w-2.5 h-2.5 rounded-full mb-2 group-hover:animate-ping"
+                          className="w-2.5 h-2.5 rounded-full mb-2"
                           style={{ backgroundColor: cfg.color }}
                         />
-                        <p className="text-xs font-medium text-stone-200 line-clamp-2 mb-1">
-                          {interaction.summary || interaction.prompt.slice(0, 40)}
+                        <p className="text-xs font-medium line-clamp-2 mb-1">
+                          {interaction.summary || interaction.prompt.slice(0, 35)}
                         </p>
-                        <p className="text-[10px] text-stone-500 font-mono">
+                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                           {new Date(interaction.timestamp).toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric'
@@ -266,18 +298,36 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                 </div>
               )}
 
-              <div className="relative z-10 flex items-center justify-between text-[11px] text-stone-500 pt-2 border-t border-stone-800/80">
-                <span>Select any node to inspect the emotional echo</span>
-                <span>432Hz Harmonic Grid</span>
+              <div
+                className="relative z-10 flex items-center justify-between text-[11px] pt-2 border-t"
+                style={{
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-muted)'
+                }}
+              >
+                <span>Select any thought to inspect its words</span>
+                <span>Calming Balance</span>
               </div>
             </div>
 
-            {/* Emotional Balance Spectrum Bar */}
-            <div className="p-4 rounded-2xl border border-stone-800 bg-stone-950/60 space-y-2">
-              <span className="text-xs font-semibold text-stone-300 uppercase tracking-wider block">
-                Harmonic Mood Spectrum
-              </span>
-              <div className="h-3 w-full rounded-full overflow-hidden flex bg-stone-800">
+            {/* Balance Bar */}
+            <div
+              className="p-4 rounded-xl border space-y-2"
+              style={{
+                backgroundColor: 'var(--bg-card-elevated)',
+                borderColor: 'var(--border-color)'
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Feeling Balance Breakdown
+                </span>
+                <InfoTooltip text="The distribution of feelings across your journal reflections." />
+              </div>
+              <div
+                className="h-2.5 w-full rounded-full overflow-hidden flex"
+                style={{ backgroundColor: 'var(--bg-canvas)' }}
+              >
                 {moodDistribution.map((item) => (
                   <div
                     key={item.mood}
@@ -293,13 +343,19 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
             </div>
           </div>
 
-          {/* Node Inspector Sidebar (1 Col) */}
-          <div className="border border-stone-800 rounded-2xl p-5 bg-stone-950/40 flex flex-col justify-between">
+          {/* Node Inspector Sidebar */}
+          <div
+            className="border rounded-2xl p-4 sm:p-5 flex flex-col justify-between"
+            style={{
+              backgroundColor: 'var(--bg-card-elevated)',
+              borderColor: 'var(--border-color)'
+            }}
+          >
             {selectedNode ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
-                    Node Details
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Thought Details
                   </span>
                   <span
                     className="px-2 py-0.5 rounded-full text-[10px] font-medium border"
@@ -313,23 +369,48 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-semibold text-stone-400 mb-1">USER REFLECTION:</h4>
-                  <p className="text-xs text-stone-200 bg-stone-900/80 p-3 rounded-xl border border-stone-800/80 italic">
+                  <h4 className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                    YOUR THOUGHT:
+                  </h4>
+                  <p
+                    className="text-xs p-3 rounded-xl border italic leading-relaxed"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                  >
                     "{selectedNode.prompt}"
                   </p>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-semibold text-stone-400 mb-1">SANCTUARY INSIGHT:</h4>
-                  <p className="text-xs text-stone-300 bg-stone-900/80 p-3 rounded-xl border border-stone-800/80 line-clamp-6">
+                  <h4 className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                    REFLECTIVE RESPONSE:
+                  </h4>
+                  <p
+                    className="text-xs p-3 rounded-xl border line-clamp-6 leading-relaxed"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     {selectedNode.response}
                   </p>
                 </div>
 
                 {selectedNode.location && (
-                  <div className="text-[11px] text-stone-400 flex items-center gap-1.5 bg-stone-900/40 p-2 rounded-lg border border-stone-800">
-                    <Compass className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Location: {selectedNode.location.placeName || 'Sanctuary Space'}</span>
+                  <div
+                    className="text-[11px] flex items-center gap-1.5 p-2 rounded-lg border"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
+                    <Compass className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                    <span>Location: {selectedNode.location.placeName || 'Peaceful Spot'}</span>
                   </div>
                 )}
 
@@ -340,17 +421,23 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                       onSelectInteraction(selectedNode);
                       onClose();
                     }}
-                    className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    className="w-full py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--accent)',
+                      color: '#ffffff'
+                    }}
                   >
-                    <span>Jump to this Dialogue</span>
+                    <span>View this Journal Entry</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-20 text-stone-500 space-y-2">
-                <Compass className="w-8 h-8 mx-auto text-stone-600" />
-                <p className="text-xs">Click any reflection node on the map to inspect its resonance</p>
+              <div className="text-center py-20 space-y-2" style={{ color: 'var(--text-muted)' }}>
+                <Compass className="w-8 h-8 mx-auto opacity-50" />
+                <p className="text-xs">
+                  Click any thought star on the map to review the entry
+                </p>
               </div>
             )}
           </div>
