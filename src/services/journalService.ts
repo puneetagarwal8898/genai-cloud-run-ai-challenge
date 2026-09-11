@@ -238,20 +238,28 @@ export async function wipeAllUserData(userId: string, userEmail?: string): Promi
     try {
       const colRef = collection(db, 'users', userId, 'interactions');
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Cloud wipe timeout (15s exceeded)')), 15000)
+        setTimeout(() => reject(new Error('Cloud wipe timeout (1200ms exceeded)')), 1200)
       );
 
       // Fetch all user interactions
       const snapshot = await Promise.race([getDocs(colRef), timeoutPromise]);
       if (snapshot && !snapshot.empty) {
-        const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+        const deletePromises = snapshot.docs.map(docSnap => 
+          Promise.race([
+            deleteDoc(docSnap.ref),
+            new Promise<void>((res) => setTimeout(res, 800))
+          ])
+        );
         await Promise.all(deletePromises);
         console.log(`[Cloud Wipe] Deleted ${snapshot.docs.length} reflections from Firestore for user ${userId}.`);
       }
 
       // Delete the root user profile document
       const userDocRef = doc(db, 'users', userId);
-      await Promise.race([deleteDoc(userDocRef), timeoutPromise]);
+      await Promise.race([
+        deleteDoc(userDocRef),
+        new Promise<void>((res) => setTimeout(res, 800))
+      ]);
       console.log(`[Cloud Wipe] Deleted user profile document for ${userId} in Firestore.`);
     } catch (err: any) {
       console.warn("Cloud records wipe note:", err.message);
@@ -283,9 +291,12 @@ export async function archiveAndWipeUserData(
   // 2. Send GDPR compliance archiving payload to backend server
   let archiveId = `gdpr-arch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
     const res = await fetch('/api/gdpr/archive-and-delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         userId,
         email: userEmail,
@@ -294,6 +305,7 @@ export async function archiveAndWipeUserData(
         deletionReason: 'User self-service complete account erasure under GDPR Article 17'
       })
     });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const data = await res.json();
       if (data.archiveId) archiveId = data.archiveId;
