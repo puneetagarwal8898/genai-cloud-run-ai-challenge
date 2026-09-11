@@ -26,6 +26,7 @@ export function sanitizePayload<T extends Record<string, any>>(obj: T): T {
 }
 
 const LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX = 'reflectai_interactions_';
+const LOCAL_STORAGE_ACCOUNTS_KEY = 'reflectai_registered_accounts';
 
 // In-memory cache for ultra-responsive 0ms access
 const memoryCache = new Map<string, JournalInteraction[]>();
@@ -188,35 +189,70 @@ export async function deleteUserInteraction(userId: string, interactionId: strin
 
 /**
  * Permanently wipes all personal user data from cloud storage and local storage.
+ * Ensures no lingering reflections, profile data, or cached items remain.
  */
-export async function wipeAllUserData(userId: string): Promise<void> {
-  if (!userId) return;
+export async function wipeAllUserData(userId: string, userEmail?: string): Promise<void> {
+  if (!userId && !userEmail) return;
 
   // 1. Instant local memory and storage wipe
-  memoryCache.delete(userId);
-  const key = `${LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX}${userId}`;
+  if (userId) {
+    memoryCache.delete(userId);
+  }
+  memoryCache.clear();
+
+  // Clean targeted local storage keys
   try {
-    localStorage.removeItem(key);
-    localStorage.removeItem(`reflectai_profile_${userId}`);
+    if (userId) {
+      localStorage.removeItem(`${LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX}${userId}`);
+      localStorage.removeItem(`reflectai_profile_${userId}`);
+    }
+
+    // Thorough scan of all localStorage keys for any associated user reflections or profiles
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (userId && (k.includes(userId) || k === `${LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX}${userId}`)) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // Clean accounts registry if userEmail is provided
+    if (userEmail) {
+      const sanitized = userEmail.trim().toLowerCase();
+      const accountsRaw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+      if (accountsRaw) {
+        const accounts = JSON.parse(accountsRaw);
+        delete accounts[sanitized];
+        localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
+      }
+    }
   } catch (err) {
     console.warn("Local storage wipe warning:", err);
   }
 
-  // 2. Wipe cloud storage records (guarded by timeout and configuration)
+  // 2. Wipe cloud storage records (Firestore users/{userId}/interactions and users/{userId})
   const creds = getFirebaseCredentialsStatus();
-  if (creds.isConfigured) {
+  if (creds.isConfigured && userId) {
     try {
       const colRef = collection(db, 'users', userId, 'interactions');
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Cloud wipe timeout')), 2500)
+        setTimeout(() => reject(new Error('Cloud wipe timeout (15s exceeded)')), 15000)
       );
+
+      // Fetch all user interactions
       const snapshot = await Promise.race([getDocs(colRef), timeoutPromise]);
       if (snapshot && !snapshot.empty) {
         const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
-        await Promise.allSettled(deletePromises);
+        await Promise.all(deletePromises);
+        console.log(`[Cloud Wipe] Deleted ${snapshot.docs.length} reflections from Firestore for user ${userId}.`);
       }
+
+      // Delete the root user profile document
       const userDocRef = doc(db, 'users', userId);
       await Promise.race([deleteDoc(userDocRef), timeoutPromise]);
+      console.log(`[Cloud Wipe] Deleted user profile document for ${userId} in Firestore.`);
     } catch (err: any) {
       console.warn("Cloud records wipe note:", err.message);
     }
@@ -285,7 +321,7 @@ export async function archiveAndWipeUserData(
   }
 
   // 4. Wipe active records from memory, localStorage, and Firestore
-  await wipeAllUserData(userId);
+  await wipeAllUserData(userId, userEmail);
 
   return { archiveId };
 }

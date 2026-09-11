@@ -55,6 +55,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   // Delete flow
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -72,6 +73,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       setSaveSuccess(false);
       setSaveError(null);
       setShowDeleteConfirm(false);
+      setDeleteInput('');
+      setDeletePassword('');
+      setDeleteError(null);
     }
   }, [isOpen]);
 
@@ -147,7 +151,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setDeleteError(null);
 
     try {
-      await deleteUserAccount();
+      await deleteUserAccount(deletePassword.trim() || undefined);
       onClose();
     } catch (err: any) {
       setDeleteError(err.message || 'Failed to complete account deletion.');
@@ -743,6 +747,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                       placeholder="Type DELETE"
                       className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
                     />
+                    {userProfile?.authProvider === 'email' && (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-medium text-rose-700 dark:text-rose-300">
+                          Account password (required to confirm identity):
+                        </label>
+                        <input
+                          id="confirm-delete-password-input"
+                          type="password"
+                          autoComplete="current-password"
+                          value={deletePassword}
+                          onChange={(e) => setDeletePassword(e.target.value)}
+                          placeholder="Enter your account password"
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-rose-500/40 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        />
+                      </div>
+                    )}
                     {deleteError && (
                       <p className="text-xs text-rose-600">{deleteError}</p>
                     )}
