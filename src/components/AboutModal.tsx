@@ -11,7 +11,8 @@ import {
   ChevronUp,
   ShieldCheck,
   HelpCircle,
-  Feather
+  Feather,
+  ArrowLeft
 } from 'lucide-react';
 
 interface AboutModalProps {
@@ -19,6 +20,7 @@ interface AboutModalProps {
   onClose: () => void;
   onOpenPrivacy?: () => void;
   onOpenTerms?: () => void;
+  onBack?: () => void;
 }
 
 interface FAQItem {
@@ -68,7 +70,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   isOpen,
   onClose,
   onOpenPrivacy,
-  onOpenTerms
+  onOpenTerms,
+  onBack
 }) => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
@@ -121,17 +124,37 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            aria-label="Close About window"
-            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onBack ? (
+              <button
+                id="about-modal-back-btn"
+                type="button"
+                onClick={onBack}
+                aria-label="Back to Settings"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                aria-label="Close About window"
+                className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Scrollable Content */}

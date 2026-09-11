@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, FileText, Lock, Trash2, CheckCircle2 } from 'lucide-react';
+import { X, ShieldCheck, FileText, Lock, Trash2, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 interface LegalModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'privacy' | 'terms';
+  onBack?: () => void;
 }
 
 export const LegalModal: React.FC<LegalModalProps> = ({
   isOpen,
   onClose,
-  initialTab = 'privacy'
+  initialTab = 'privacy',
+  onBack
 }) => {
   const [activeTab, setActiveTab] = useState<'privacy' | 'terms'>(initialTab);
 
@@ -73,17 +75,37 @@ export const LegalModal: React.FC<LegalModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            aria-label="Close legal window"
-            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onBack ? (
+              <button
+                id="legal-modal-back-btn"
+                type="button"
+                onClick={onBack}
+                aria-label="Back to Settings"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                aria-label="Close legal window"
+                className="p-1.5 rounded-lg opacity-70 hover:opacity-100 transition cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Scrollable Content */}

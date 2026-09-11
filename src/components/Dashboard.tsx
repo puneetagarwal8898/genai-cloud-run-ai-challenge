@@ -100,6 +100,7 @@ export const Dashboard: React.FC = () => {
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
   const [showLegalModal, setShowLegalModal] = useState<boolean>(false);
+  const [navigatedFromSettings, setNavigatedFromSettings] = useState<boolean>(false);
   const [stagedLocation, setStagedLocation] = useState<SanctuaryLocation | null>(null);
 
   // Email verification gate: email auth accounts require emailVerified: true to converse
@@ -586,7 +587,10 @@ export const Dashboard: React.FC = () => {
             <button
               id="open-about-modal-header-btn"
               type="button"
-              onClick={() => setShowAboutModal(true)}
+              onClick={() => {
+                setNavigatedFromSettings(false);
+                setShowAboutModal(true);
+              }}
               title="About & FAQ"
               className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90"
               style={{
@@ -613,7 +617,7 @@ export const Dashboard: React.FC = () => {
           </button>
 
           <div
-            className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l"
+            className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l shrink-0"
             style={{ borderColor: 'var(--border-color)' }}
           >
             {userProfile?.photoURL ? (
@@ -621,20 +625,20 @@ export const Dashboard: React.FC = () => {
                 src={userProfile.photoURL}
                 alt={userProfile.displayName || "User"}
                 referrerPolicy="no-referrer"
-                className="w-7 h-7 rounded-full object-cover border"
+                className="w-7 h-7 rounded-full object-cover border shrink-0"
                 style={{ borderColor: 'var(--border-color)' }}
               />
             ) : (
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
                 style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
               >
                 <UserIcon className="w-3.5 h-3.5" />
               </div>
             )}
-            <div className="hidden md:block text-left">
+            <div className="hidden md:block text-left w-[110px] lg:w-[130px] shrink-0">
               <div className="flex items-center gap-1">
-                <p className="text-xs font-semibold leading-tight truncate max-w-[150px]" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-xs font-semibold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
                   {userProfile?.displayName || "Reflector"}
                 </p>
                 {userProfile?.emailVerified && (
@@ -1471,8 +1475,16 @@ export const Dashboard: React.FC = () => {
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onOpenAbout={() => setShowAboutModal(true)}
-        onOpenLegal={() => setShowLegalModal(true)}
+        onOpenAbout={() => {
+          setNavigatedFromSettings(true);
+          setShowSettingsModal(false);
+          setShowAboutModal(true);
+        }}
+        onOpenLegal={() => {
+          setNavigatedFromSettings(true);
+          setShowSettingsModal(false);
+          setShowLegalModal(true);
+        }}
       />
 
       {/* Standout Feature 2: Echoes of Mind - Emotional Resonance Map Modal */}
@@ -1507,13 +1519,29 @@ export const Dashboard: React.FC = () => {
       {/* About & FAQ Modal */}
       <AboutModal
         isOpen={showAboutModal}
-        onClose={() => setShowAboutModal(false)}
+        onClose={() => {
+          setShowAboutModal(false);
+          setNavigatedFromSettings(false);
+        }}
+        onBack={navigatedFromSettings ? () => {
+          setShowAboutModal(false);
+          setNavigatedFromSettings(false);
+          setShowSettingsModal(true);
+        } : undefined}
       />
 
       {/* Privacy Policy & Terms of Service Modal */}
       <LegalModal
         isOpen={showLegalModal}
-        onClose={() => setShowLegalModal(false)}
+        onClose={() => {
+          setShowLegalModal(false);
+          setNavigatedFromSettings(false);
+        }}
+        onBack={navigatedFromSettings ? () => {
+          setShowLegalModal(false);
+          setNavigatedFromSettings(false);
+          setShowSettingsModal(true);
+        } : undefined}
       />
     </div>
   );
