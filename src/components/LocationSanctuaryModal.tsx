@@ -10,13 +10,13 @@ import {
   Search
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import L from 'leaflet';
 import {
   APIProvider,
   Map,
   AdvancedMarker,
   Pin,
-  useMap,
-  useMapsLibrary
+  useMap
 } from '@vis.gl/react-google-maps';
 import { SanctuaryLocation, JournalInteraction } from '../types';
 
@@ -38,7 +38,7 @@ const SANCTUARY_PRESETS = [
 /**
  * Controller to smoothly pan the Google Map when center coordinates change
  */
-const MapController: React.FC<{ center: { lat: number; lng: number } }> = ({ center }) => {
+const GoogleMapController: React.FC<{ center: { lat: number; lng: number } }> = ({ center }) => {
   const map = useMap();
   useEffect(() => {
     if (map && center && typeof center.lat === 'number' && typeof center.lng === 'number') {
@@ -52,6 +52,15 @@ const MapController: React.FC<{ center: { lat: number; lng: number } }> = ({ cen
   return null;
 };
 
+interface PlaceSuggestion {
+  id: string;
+  name: string;
+  formattedAddress: string;
+  latitude: number;
+  longitude: number;
+  type: string;
+}
+
 interface PlaceAutocompleteInputProps {
   value: string;
   onChange: (val: string) => void;
@@ -59,86 +68,56 @@ interface PlaceAutocompleteInputProps {
 }
 
 /**
- * Autocomplete input powered by Google Places service with styled suggestions
+ * Real-time Autocomplete input with instant suggestions dropdown and coordinates
  */
 const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
   value,
   onChange,
   onPlaceSelected
 }) => {
-  const places = useMapsLibrary('places');
-  const [predictions, setPredictions] = useState<Array<{
-    placeId: string;
-    description: string;
-    mainText: string;
-    secondaryText: string;
-  }>>([]);
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const sessionTokenRef = useRef<any>(null);
-  const autocompleteServiceRef = useRef<any>(null);
-  const placesServiceRef = useRef<any>(null);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeFetchRef = useRef<number>(0);
 
+  // Debounced search fetching matching locations with real coordinates
   useEffect(() => {
-    if (!places) return;
-    try {
-      autocompleteServiceRef.current = new places.AutocompleteService();
-      sessionTokenRef.current = new places.AutocompleteSessionToken();
-      const dummyDiv = document.createElement('div');
-      placesServiceRef.current = new places.PlacesService(dummyDiv);
-    } catch (err) {
-      console.warn('Google Places service init error:', err);
-    }
-  }, [places]);
-
-  useEffect(() => {
-    if (!value || value.trim().length < 2 || !autocompleteServiceRef.current) {
-      setPredictions([]);
+    if (!value || value.trim().length < 2) {
+      setSuggestions([]);
       setIsOpen(false);
+      setIsLoading(false);
       return;
     }
 
-    let active = true;
+    const fetchId = ++activeFetchRef.current;
     setIsLoading(true);
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       try {
-        autocompleteServiceRef.current.getPlacePredictions(
-          {
-            input: value.trim(),
-            sessionToken: sessionTokenRef.current
-          },
-          (results: any[], status: any) => {
-            if (!active) return;
-            setIsLoading(false);
-            if (status === 'OK' && results && results.length > 0) {
-              setPredictions(
-                results.slice(0, 5).map((p) => ({
-                  placeId: p.place_id,
-                  description: p.description,
-                  mainText: p.structured_formatting?.main_text || p.description,
-                  secondaryText: p.structured_formatting?.secondary_text || ''
-                }))
-              );
-              setIsOpen(true);
-            } else {
-              setPredictions([]);
-              setIsOpen(false);
-            }
-          }
-        );
+        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(value.trim())}`);
+        if (res.ok && activeFetchRef.current === fetchId) {
+          const data: PlaceSuggestion[] = await res.json();
+          setSuggestions(data);
+          setIsOpen(data.length > 0);
+          setSelectedIndex(-1);
+        }
       } catch (err) {
-        setIsLoading(false);
+        console.warn('Autocomplete fetch notice:', err);
+      } finally {
+        if (activeFetchRef.current === fetchId) {
+          setIsLoading(false);
+        }
       }
-    }, 280);
+    }, 180);
 
     return () => {
-      active = false;
       clearTimeout(timer);
     };
-  }, [value, places]);
+  }, [value]);
 
+  // Click outside to dismiss dropdown
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -149,29 +128,31 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const handleSelectPrediction = (item: { placeId: string; description: string; mainText: string }) => {
-    onChange(item.mainText);
+  const handleSelect = (item: PlaceSuggestion) => {
+    onChange(item.name);
+    onPlaceSelected(item.name, item.latitude, item.longitude);
     setIsOpen(false);
+    setSelectedIndex(-1);
+  };
 
-    if (placesServiceRef.current) {
-      placesServiceRef.current.getDetails(
-        {
-          placeId: item.placeId,
-          fields: ['geometry', 'name', 'formatted_address'],
-          sessionToken: sessionTokenRef.current
-        },
-        (details: any, status: any) => {
-          if (status === 'OK' && details?.geometry?.location) {
-            const lat = details.geometry.location.lat();
-            const lng = details.geometry.location.lng();
-            onPlaceSelected(details.name || item.mainText, lat, lng);
-            // Regenerate session token after query completion
-            if (places) {
-              sessionTokenRef.current = new places.AutocompleteSessionToken();
-            }
-          }
-        }
-      );
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen || suggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && suggestions[selectedIndex]) {
+        handleSelect(suggestions[selectedIndex]);
+      } else if (suggestions.length > 0) {
+        handleSelect(suggestions[0]);
+      }
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
     }
   };
 
@@ -189,9 +170,10 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
             }
           }}
           onFocus={() => {
-            if (predictions.length > 0) setIsOpen(true);
+            if (suggestions.length > 0) setIsOpen(true);
           }}
-          placeholder="e.g. Garden Pavilion, Kyoto Bamboo, Morning Porch"
+          onKeyDown={handleKeyDown}
+          placeholder="Type any place, city, or sanctuary (e.g. Central Park, Kyoto)"
           className="w-full text-xs px-3.5 py-2.5 rounded-xl border focus:outline-none transition pr-8"
           style={{
             backgroundColor: 'var(--bg-input)',
@@ -209,49 +191,202 @@ const PlaceAutocompleteInput: React.FC<PlaceAutocompleteInputProps> = ({
         </div>
       </div>
 
-      {isOpen && predictions.length > 0 && (
+      {/* Auto-suggestions dropdown list */}
+      {isOpen && suggestions.length > 0 && (
         <div
-          className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border shadow-2xl z-50 overflow-hidden max-h-56 overflow-y-auto custom-scrollbar"
+          className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto custom-scrollbar"
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-color)',
             color: 'var(--text-primary)'
           }}
         >
-          {predictions.map((p) => (
-            <button
-              key={p.placeId}
-              type="button"
-              onClick={() => handleSelectPrediction(p)}
-              className="w-full text-left px-3.5 py-2.5 transition flex items-start gap-2.5 border-b last:border-b-0 cursor-pointer"
-              style={{
-                borderColor: 'var(--border-color)',
-                backgroundColor: 'var(--bg-card)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-card-elevated)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-card)';
-              }}
-            >
-              <MapPin className="w-3.5 h-3.5 shrink-0 text-amber-500 mt-0.5" />
-              <div className="min-w-0 flex-1 truncate">
-                <p className="font-semibold text-xs leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
-                  {p.mainText}
-                </p>
-                {p.secondaryText && (
-                  <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {p.secondaryText}
+          <div className="px-3 py-1.5 border-b text-[10px] uppercase font-semibold tracking-wider flex items-center justify-between"
+            style={{
+              backgroundColor: 'var(--bg-card-elevated)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-muted)'
+            }}
+          >
+            <span>Suggested Locations & Coordinates</span>
+            <span>{suggestions.length} results</span>
+          </div>
+
+          {suggestions.map((item, idx) => {
+            const isSelected = idx === selectedIndex;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelect(item)}
+                className="w-full text-left px-3.5 py-2.5 transition flex items-start gap-2.5 border-b last:border-b-0 cursor-pointer"
+                style={{
+                  borderColor: 'var(--border-color)',
+                  backgroundColor: isSelected ? 'var(--bg-card-elevated)' : 'var(--bg-card)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-card-elevated)';
+                  setSelectedIndex(idx);
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)';
+                  }
+                }}
+              >
+                <div className="mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500">
+                  <MapPin className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-xs leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
+                      {item.name}
+                    </p>
+                    {item.type && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-wider font-medium shrink-0 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        {item.type}
+                      </span>
+                    )}
+                  </div>
+                  {item.formattedAddress && (
+                    <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {item.formattedAddress}
+                    </p>
+                  )}
+                  <p className="text-[10px] font-mono mt-1" style={{ color: 'var(--accent)' }}>
+                    {item.latitude.toFixed(4)}° N, {item.longitude.toFixed(4)}° E
                   </p>
-                )}
-              </div>
-            </button>
-          ))}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
   );
+};
+
+/**
+ * Interactive Leaflet sanctuary map for 100% reliable local/offline rendering
+ */
+interface LeafletSanctuaryMapProps {
+  center: { lat: number; lng: number };
+  placeName: string;
+  onCoordinatesSelected: (lat: number, lng: number) => void;
+  savedInteractions?: JournalInteraction[];
+  onSelectPin?: (interaction: JournalInteraction) => void;
+}
+
+const LeafletSanctuaryMap: React.FC<LeafletSanctuaryMapProps> = ({
+  center,
+  onCoordinatesSelected,
+  savedInteractions = [],
+  onSelectPin
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const mainMarkerRef = useRef<L.Marker | null>(null);
+  const pastMarkersRef = useRef<L.Marker[]>([]);
+
+  useEffect(() => {
+    if (!containerRef.current || mapInstanceRef.current) return;
+
+    const map = L.map(containerRef.current, {
+      center: [center.lat, center.lng],
+      zoom: 11,
+      zoomControl: true,
+      attributionControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Glowing amber sanctuary pin icon
+    const mainIcon = L.divIcon({
+      className: 'sanctuary-pin-wrapper',
+      html: `
+        <div class="sanctuary-pin-pulse">
+          <div style="background-color: #f59e0b; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 2.5px solid #ffffff;">
+            <div style="width: 7px; height: 7px; background-color: #ffffff; border-radius: 50%;"></div>
+          </div>
+        </div>
+      `,
+      iconSize: [32, 32],
+      iconAnchor: [16, 28]
+    });
+
+    const marker = L.marker([center.lat, center.lng], {
+      icon: mainIcon,
+      draggable: true
+    }).addTo(map);
+
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      onCoordinatesSelected(pos.lat, pos.lng);
+    });
+
+    map.on('click', (e) => {
+      onCoordinatesSelected(e.latlng.lat, e.latlng.lng);
+    });
+
+    mainMarkerRef.current = marker;
+    mapInstanceRef.current = map;
+
+    // Small delay to ensure container dimension calculation settles after modal fade-in
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // Smoothly fly map and update marker pin when center coordinates update
+  useEffect(() => {
+    if (mapInstanceRef.current && mainMarkerRef.current) {
+      mapInstanceRef.current.flyTo([center.lat, center.lng], Math.max(mapInstanceRef.current.getZoom(), 11), {
+        duration: 1.0
+      });
+      mainMarkerRef.current.setLatLng([center.lat, center.lng]);
+    }
+  }, [center.lat, center.lng]);
+
+  // Render reflection history pins
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    pastMarkersRef.current.forEach((m) => m.remove());
+    pastMarkersRef.current = [];
+
+    const pastIcon = L.divIcon({
+      className: 'past-pin-wrapper',
+      html: `
+        <div style="background-color: #0ea5e9; width: 18px; height: 18px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 1.5px solid #ffffff;">
+          <div style="width: 5px; height: 5px; background-color: #ffffff; border-radius: 50%;"></div>
+        </div>
+      `,
+      iconSize: [24, 24],
+      iconAnchor: [12, 22]
+    });
+
+    savedInteractions.forEach((item) => {
+      if (!item.location) return;
+      const m = L.marker([item.location.latitude, item.location.longitude], { icon: pastIcon }).addTo(map);
+      m.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        onSelectPin?.(item);
+      });
+      pastMarkersRef.current.push(m);
+    });
+  }, [savedInteractions]);
+
+  return <div ref={containerRef} className="w-full h-full" style={{ minHeight: '100%' }} />;
 };
 
 export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
@@ -339,24 +474,24 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
     }, 1200);
   };
 
-  const hasInteractiveMap = Boolean(apiKey && !authError);
+  const hasGoogleMaps = Boolean(apiKey && !authError);
 
   const renderModalContent = () => (
     <div className="flex-1 p-5 sm:p-6 overflow-y-auto space-y-5 custom-scrollbar text-sm">
-      {/* Map or Peaceful Coordinates View */}
+      {/* Interactive Map View with Live Coordinates */}
       <div
-        className="relative rounded-2xl overflow-hidden border h-[250px] sm:h-[270px] w-full flex flex-col justify-center items-center shadow-inner"
+        className="relative rounded-2xl overflow-hidden border h-[260px] sm:h-[280px] w-full flex flex-col justify-center items-center shadow-inner"
         style={{
           backgroundColor: 'var(--bg-canvas)',
           borderColor: 'var(--border-color)'
         }}
       >
-        {hasInteractiveMap ? (
+        {hasGoogleMaps ? (
           <Map
             style={{ width: '100%', height: '100%' }}
             defaultCenter={currentPos}
             center={currentPos}
-            defaultZoom={10}
+            defaultZoom={11}
             mapId="DEMO_MAP_ID"
             internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
             gestureHandling="cooperative"
@@ -381,23 +516,18 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
                 </AdvancedMarker>
               );
             })}
-            <MapController center={currentPos} />
+            <GoogleMapController center={currentPos} />
           </Map>
         ) : (
-          <div className="p-6 text-center space-y-2">
-            <Globe className="w-8 h-8 mx-auto" style={{ color: 'var(--accent)' }} />
-            <div>
-              <h4 className="text-xs sm:text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Peaceful Sanctuary Coordinates
-              </h4>
-              <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--accent)' }}>
-                {currentPos.lat.toFixed(4)}° N, {currentPos.lng.toFixed(4)}° E
-              </p>
-            </div>
-            <p className="text-[11px] max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
-              Select a tranquil preset below or use your device location to anchor your reflection in place.
-            </p>
-          </div>
+          <LeafletSanctuaryMap
+            center={currentPos}
+            placeName={placeName}
+            onCoordinatesSelected={(lat, lng) => {
+              setCurrentPos({ lat, lng });
+            }}
+            savedInteractions={interactionsWithLocation}
+            onSelectPin={(item) => setSelectedPin(item)}
+          />
         )}
 
         {/* Selected Pin Overlay */}
@@ -429,38 +559,34 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
             </p>
           </div>
         )}
+
+        {/* Floating Pinpoint Indicator Badge */}
+        <div
+          className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono shadow-md z-20 backdrop-blur-sm pointer-events-none"
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            color: '#f8fafc'
+          }}
+        >
+          📍 {currentPos.lat.toFixed(4)}°, {currentPos.lng.toFixed(4)}°
+        </div>
       </div>
 
-      {/* Location Name with Autocomplete & Device Position */}
+      {/* Location Name with Real-Time Autocomplete Dropdown & Device Position */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
             Place Name / Sanctuary
           </label>
-          {hasInteractiveMap ? (
-            <PlaceAutocompleteInput
-              value={placeName}
-              onChange={(val) => setPlaceName(val)}
-              onPlaceSelected={(name, lat, lng) => {
-                setPlaceName(name);
-                setCurrentPos({ lat, lng });
-              }}
-            />
-          ) : (
-            <input
-              id="location-name-input"
-              type="text"
-              value={placeName}
-              onChange={(e) => setPlaceName(e.target.value)}
-              placeholder="e.g. Garden Pavilion, Morning Porch"
-              className="w-full text-xs px-3.5 py-2.5 rounded-xl border focus:outline-none transition"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-primary)'
-              }}
-            />
-          )}
+          <PlaceAutocompleteInput
+            value={placeName}
+            onChange={(val) => setPlaceName(val)}
+            onPlaceSelected={(name, lat, lng) => {
+              setPlaceName(name);
+              setCurrentPos({ lat, lng });
+            }}
+          />
         </div>
 
         <div className="flex items-end">
@@ -484,7 +610,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
       {/* Sanctuary Geographies Presets */}
       <div>
         <span className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-          Or Choose a Peaceful Destination
+          Or Choose a Peaceful Destination Preset
         </span>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {SANCTUARY_PRESETS.map((preset) => (
@@ -615,7 +741,7 @@ export const LocationSanctuaryModal: React.FC<LocationSanctuaryModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        {hasInteractiveMap ? (
+        {hasGoogleMaps ? (
           <APIProvider
             apiKey={apiKey}
             libraries={['places']}
