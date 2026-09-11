@@ -163,3 +163,40 @@ export async function deleteUserInteraction(userId: string, interactionId: strin
     console.warn("Firestore delete note:", err.message);
   }
 }
+
+/**
+ * Permanently wipes all personal user data from Cloud Firestore and local storage.
+ * Deletes all interaction documents under /users/{userId}/interactions/*,
+ * deletes the user profile doc /users/{userId}, and clears all cached reflections.
+ */
+export async function wipeAllUserData(userId: string): Promise<void> {
+  if (!userId) return;
+
+  // 1. Wipe local interaction cache
+  const key = `${LOCAL_STORAGE_INTERACTIONS_KEY_PREFIX}${userId}`;
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn("Local storage wipe warning:", e);
+  }
+
+  // 2. Wipe Firestore subcollection documents
+  try {
+    const colRef = collection(db, 'users', userId, 'interactions');
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+      await Promise.allSettled(deletePromises);
+    }
+  } catch (err: any) {
+    console.warn("Firestore subcollection wipe warning:", err.message);
+  }
+
+  // 3. Wipe parent user doc
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    await deleteDoc(userDocRef);
+  } catch (err: any) {
+    console.warn("Firestore user doc wipe warning:", err.message);
+  }
+}

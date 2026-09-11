@@ -44,10 +44,18 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
   - 💡 **Creative Brainstorm**: Expansive ideation, exploratory prompts, and innovative avenues.
   - 📝 **Structured Summary**: Concise bullet points, core takeaways, and actionable next steps.
   - 🧭 **Compassionate Guidance**: Practical strategies, grounding exercises, and thoughtful encouragement.
+- **Standout Hackathon Innovations**:
+  - 🌌 **Echoes of Mind (Emotional Resonance Map)**: An interactive canvas visualizing mental topology, emotional mood orbits (Calm, Clarity, Gratitude, Courage, Growth, Reflective), and resonant connections between thoughts over time.
+  - 🎙️ **Sanctuary Voice Mode**: Seamless browser speech-to-text recording paired with contemplative AI read-aloud voice synthesis and a soothing 432Hz ambient drone.
+  - ⏳ **Serenity Time Capsule**: Seal deep reflections in a chronological vault for 7, 30, 90, or 365 days. Upon unsealing, Gemini synthesizes your personal growth, highlighting emergent emotional strengths and celebrations.
+  - 🗺️ **Location-Aware Sanctuary Journey**: Ground reflections in physical space using Google Maps Platform (`@vis.gl/react-google-maps`). Tag physical locations via device GPS or famous meditative sanctuaries (Kyoto Bamboo Grove, Big Sur, Lake Louise).
+  - ⚙️ **Account Settings & Data Sovereignty**: Manage your public profile name, customized mindful avatar, view locked email IDs, customize voice pitch/rate/ambient sounds, and execute full GDPR-compliant account deletion with complete Firestore data wipes.
 - **Multi-Turn Conversation Trails**:
   - Ask follow-up questions to any reflection without losing context.
   - Dynamic AI suggestion chips provide immediate starting points for deeper introspection.
   - Typing in the composer automatically clears chips to keep the workspace clean.
+- **Polite Verification Gate**:
+  - Unverified email users can freely log in and explore their sanctuary, while politely prompted to verify their account before initiating new AI reflections.
 - **Aesthetic Sanctuary Themes**:
   - **Dark Themes**: Midnight Violet, Nordic Slate, Candlelight Amber, Sage Calm.
   - **Daylight Themes**: Warm Paper, Solar Daylight, Daylight Sage.
@@ -421,16 +429,23 @@ Twitter (X) OAuth requires no business verification and can be configured seamle
 
 ## Functional Stability & Verification Walkthrough
 
-The following step-by-step test matrix verifies every critical user interaction:
+The following step-by-step test matrix verifies every critical user interaction across all sanctuary features:
 
 | Test Case | Step-by-Step Actions | Expected Result |
 | :--- | :--- | :--- |
 | **1. Mobile Responsive UI** | Open the app in a mobile viewport (<640px). | The header shows compact icons (`🧪`/`🚀`, `Sun`/`Moon`, Palette dot) without horizontal overflow or text wrapping. |
 | **2. Production Environment Locking** | Deploy with `APP_ENV=production` or click the `🚀` mode button. | The test sandbox card is removed, the `🧪`/`🚀` switcher is hidden, and the **SSL Encrypted** badge is displayed. |
 | **3. Email Sign-Up & Verification Link** | Enter email/password on Sign Up and click **Create Sanctuary Account**. | Account registers in Firebase; Google Firebase dispatches a verification link to your inbox; sanctuary dashboard shows the verification banner until verified. |
-| **4. AI Reflection & Follow-Up Chips** | Submit a reflection prompt in the composer. | AI streams a thoughtful response; 3 intelligent follow-up suggestions appear. Typing in composer clears suggestions. |
-| **5. Permanent Reflection Deletion** | Click the trash icon on a past reflection in the sidebar and confirm deletion. | The entry is removed from Firestore and disappears with a smooth exit animation. |
-| **6. Secret Key Isolation** | Inspect browser network requests to `/api/config` or client source. | The `GEMINI_API_KEY` is completely absent from browser bundles; API calls proxy securely through `/api/converse`. |
+| **4. Polite Email Verification Gate** | With an unverified email account, try submitting a reflection in the composer or clicking a suggestion chip. | A polite modal dialog appears explaining that email verification is required to converse with the AI, with buttons to resend the link or confirm verification. |
+| **5. AI Reflection & Follow-Up Chips** | Submit a reflection prompt in the composer. | AI returns a thoughtful response with emotional mood categorization; 3 intelligent follow-up suggestions appear. Typing in composer immediately clears suggestions. |
+| **6. Sanctuary Voice Mode (Speech-to-Text)** | Click the microphone icon in the composer, speak a reflection, and click stop. | Browser SpeechRecognition transcribes your words directly into the reflection textarea in real-time. |
+| **7. Sanctuary Audio Narration & 432Hz Drone** | Click the audio play button on any AI reflection response bubble. | Peaceful speech synthesis reads the reflection aloud accompanied by a soothing 432Hz binaural drone with live playback waves. |
+| **8. Serenity Time Capsule** | In the composer or header, click **Capsule**, choose 7/30/90/365 days, and seal the active reflection. | The reflection is locked into the Time Capsule Vault. Clicking **Unseal** triggers Gemini 3.6 Flash to analyze personal growth, celebrating emergent strengths. |
+| **9. Echoes of Mind (Resonance Map)** | Click **Echoes** in the top navigation. | Interactive visual canvas renders reflections as emotional nodes (Calm, Clarity, Gratitude, Courage, Growth, Reflective) with connecting resonance links and mood statistics. |
+| **10. Location-Aware Sanctuary Journey** | Click **Sanctuaries** in header or **Tag Location** in composer. Tag GPS coordinates or select a sanctuary preset (e.g. Kyoto Bamboo Grove, Big Sur). | Physical coordinates and sanctuary landmark are pinned on the interactive Google Map and attached to the reflection. |
+| **11. Account Settings & Profile Update** | Click the Settings icon in the header next to the avatar. Update display name, pick an avatar, adjust voice sliders, and save. | Profile changes reflect across the dashboard immediately and persist to user profile storage. Email address is permanently locked and uneditable. |
+| **12. Account Deletion & Firestore Data Wipe** | In Settings &rarr; **Delete Account**, type `DELETE` and click **Permanently Delete My Sanctuary**. | All user interactions, time capsules, and profile documents are wiped clean from Cloud Firestore, and the session is signed out safely. |
+| **13. Secret Key Isolation** | Inspect browser network requests to `/api/config` or client source. | The `GEMINI_API_KEY` is completely absent from browser bundles; all generative AI calls proxy securely through server-side `/api/gemini/*` endpoints. |
 
 ---
 

@@ -1,5 +1,35 @@
 export type AuthProviderType = 'google' | 'linkedin' | 'twitter' | 'email';
 
+export type SanctuaryMood = 'calm' | 'clarity' | 'gratitude' | 'courage' | 'growth' | 'anxious' | 'reflective';
+
+export interface SanctuaryLocation {
+  name?: string;
+  placeName?: string;
+  lat?: number;
+  lng?: number;
+  latitude: number;
+  longitude: number;
+  description?: string;
+  category?: 'nature' | 'urban' | 'zen' | 'coastal' | 'home';
+}
+
+export interface TimeCapsuleData {
+  isSealed: boolean;
+  sealDate: string;
+  unlockDate: string;
+  capsulePrompt?: string;
+  growthSummary?: string;
+  celebrationText?: string;
+}
+
+export interface UserPreferences {
+  voicePitch?: number;
+  voiceRate?: number;
+  ambientSound?: boolean;
+  autoReadAloud?: boolean;
+  avatarSeed?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -9,6 +39,7 @@ export interface UserProfile {
   emailVerified?: boolean;
   createdAt: string;
   lastActiveAt?: string;
+  preferences?: UserPreferences;
 }
 
 export type ReflectionMode = 'reflection' | 'brainstorm' | 'summary' | 'advice';
@@ -44,12 +75,24 @@ export interface JournalInteraction {
   }>;
   createdAt: string;
   updatedAt: string;
+  // Standout capabilities
+  mood?: SanctuaryMood;
+  location?: SanctuaryLocation;
+  timeCapsule?: TimeCapsuleData;
+  isTimeCapsule?: boolean;
+  capsuleUnlockDate?: string;
+  capsuleSealed?: boolean;
+  capsuleNote?: string;
+  growthSynthesis?: string;
 }
 
 export interface ConverseRequestBody {
   prompt: string;
   mode?: ReflectionMode;
   title?: string;
+  location?: SanctuaryLocation;
+  isTimeCapsule?: boolean;
+  capsuleUnlockDate?: string;
   history?: Array<{
     role: 'user' | 'model';
     text: string;
@@ -60,5 +103,13 @@ export interface ConverseResponseBody {
   response: string;
   summary?: string;
   suggestedPrompts?: string[];
+  modelUsed: string;
+  mood?: SanctuaryMood;
+}
+
+export interface GrowthSynthesisResponse {
+  growthAnalysis: string;
+  celebrationText: string;
+  emergentStrengths: string[];
   modelUsed: string;
 }
