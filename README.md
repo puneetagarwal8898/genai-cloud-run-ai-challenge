@@ -15,15 +15,18 @@ ReflectAI Sanctuary is a secure, distraction-free digital journal and guided min
 
 ## Table of Contents
 1. [About the Project](#about-the-project)
-2. [Key Features](#key-features)
-3. [Technologies Used](#technologies-used)
-4. [Recommended License](#recommended-license)
-5. [Local Development Guide](#local-development-guide)
-6. [Cloud Run Deployment Guide](#cloud-run-deployment-guide)
-7. [Secret Management (Google Cloud Secret Manager)](#secret-management-google-cloud-secret-manager)
-8. [Database Security (Cloud Firestore)](#database-security-cloud-firestore)
-9. [OAuth 2.0 Provider Setup](#oauth-20-provider-setup)
-10. [Functional Stability & Verification Walkthrough](#functional-stability--verification-walkthrough)
+2. [Application Features](#application-features)
+3. [Enhanced Features Built in Sanctuary](#enhanced-features-built-in-sanctuary)
+4. [Technologies Used](#technologies-used)
+5. [Required Environment Keys & Secrets](#required-environment-keys--secrets)
+6. [Local Development Guide (Run Locally)](#local-development-guide-run-locally)
+7. [Google Cloud Run Deployment Guide](#google-cloud-run-deployment-guide)
+8. [Fast Re-deployment & Git Update Workflow](#fast-re-deployment--git-update-workflow)
+9. [Secret Management (Google Cloud Secret Manager)](#secret-management-google-cloud-secret-manager)
+10. [Database Security (Cloud Firestore)](#database-security-cloud-firestore)
+11. [OAuth 2.0 Provider Setup](#oauth-20-provider-setup)
+12. [Recommended License](#recommended-license)
+13. [Functional Stability & Verification Walkthrough](#functional-stability--verification-walkthrough)
 
 ---
 
@@ -34,22 +37,17 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
 - **Calm, Mindful Aesthetics**: 7 human-centric color palettes, dark/light daylight modes, and a gentle cursor wave effect that fosters tranquility.
 - **Multi-Turn Thought Exploration**: Continuous conversational trails allowing you to delve deeper into feelings or dilemmas with context-aware suggestion chips.
 - **Production Isolation**: A robust dual-environment system that isolates developer simulation tools during testing, while locking the interface into a secure, verified portal in production.
+- **Horizontal-Scroll-Free Fluid Responsive Interface**: Fully responsive, mobile-first design with strict horizontal overflow prevention (`overflow-x-hidden`) across all viewports and mobile screens.
 
 ---
 
-## Key Features
+## Application Features
 
 - **4 Guided Reflection Archetypes**:
   - 🌿 **Deep Reflection**: Empathetic, introspective analysis and gentle cognitive reframing.
   - 💡 **Creative Brainstorm**: Expansive ideation, exploratory prompts, and innovative avenues.
   - 📝 **Structured Summary**: Concise bullet points, core takeaways, and actionable next steps.
   - 🧭 **Compassionate Guidance**: Practical strategies, grounding exercises, and thoughtful encouragement.
-- **Standout Hackathon Innovations**:
-  - 🌌 **Echoes of Mind (Emotional Resonance Map)**: An interactive canvas visualizing mental topology, emotional mood orbits (Calm, Clarity, Gratitude, Courage, Growth, Reflective), and resonant connections between thoughts over time.
-  - 🎙️ **Sanctuary Voice Mode**: Seamless browser speech-to-text recording paired with contemplative AI read-aloud voice synthesis and a soothing 432Hz ambient drone.
-  - ⏳ **Serenity Time Capsule**: Seal deep reflections in a chronological vault for 7, 30, 90, or 365 days. Upon unsealing, Gemini synthesizes your personal growth, highlighting emergent emotional strengths and celebrations.
-  - 🗺️ **Location-Aware Sanctuary Journey**: Ground reflections in physical space using Google Maps Platform (`@vis.gl/react-google-maps`). Tag physical locations via device GPS or famous meditative sanctuaries (Kyoto Bamboo Grove, Big Sur, Lake Louise).
-  - ⚙️ **Account Settings & Data Sovereignty**: Manage your public profile name, customized mindful avatar, view locked email IDs, customize voice pitch/rate/ambient sounds, and execute full GDPR-compliant account deletion with complete Firestore data wipes.
 - **Multi-Turn Conversation Trails**:
   - Ask follow-up questions to any reflection without losing context.
   - Dynamic AI suggestion chips provide immediate starting points for deeper introspection.
@@ -60,8 +58,8 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
   - **Dark Themes**: Midnight Violet, Nordic Slate, Candlelight Amber, Sage Calm.
   - **Daylight Themes**: Warm Paper, Solar Daylight, Daylight Sage.
 - **Mobile-First Responsive Design**:
-  - Streamlined icon-only controls on mobile viewports for compact screen fit.
-  - Expansive multi-column split layout on desktop with collapsible reflection history.
+  - Consolidated 4-bit mobile header: Single-button enhancements menu (`Wand2`), compact user avatar with status badge, modal trigger, and quick theme toggle.
+  - Zero horizontal scrolling across any viewport size, from ultra-compact smartphones (320px+) to 4K ultra-wide monitors.
 - **Flexible & Secure Authentication**:
   - **Google Sign-In** via Firebase Auth popup.
   - **LinkedIn Sign-In** via OpenID Connect.
@@ -73,6 +71,40 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
 
 ---
 
+## Enhanced Features Built in Sanctuary
+
+The sanctuary incorporates specialized, purpose-built mindfulness and introspection capabilities:
+
+1. **Echoes of Mind (Emotional Resonance Map)**:
+   - Interactive visual canvas rendering reflections as nodes in mental topology.
+   - Categorizes thoughts into 6 emotional mood orbits: *Calm, Clarity, Gratitude, Courage, Growth, and Reflective*.
+   - Dynamic resonance links connect emotionally aligned thoughts across time with interactive mood distributions and node inspection drawers.
+
+2. **Sanctuary Voice Mode (Speech-to-Text & Contemplative Audio)**:
+   - Built-in browser speech recognition transcribing reflections directly into the reflection composer with live status indicators.
+   - Auto-dismissing error notifications with manual close controls to keep the UI clean.
+   - Contemplative text-to-speech narration paired with an ambient 432Hz sine-wave healing drone and animated audio wave visualizer.
+
+3. **Serenity Time Capsule**:
+   - Vault mechanism allowing users to seal thoughts for future reflection over designated time horizons: 7 days, 30 days, 90 days, or 365 days.
+   - Unsealing protocol powered by Gemini 3.6 Flash that synthesizes personal growth, celebrating emergent strengths and emotional milestones.
+
+4. **Location-Aware Sanctuary Journey**:
+   - Anchors reflections in physical space using Google Maps Platform (`@vis.gl/react-google-maps`).
+   - Pin device GPS coordinates or pick curated meditative sanctuaries (Kyoto Bamboo Grove, Big Sur Coastline, Lake Louise).
+   - Filter and explore reflections geographically on an interactive map.
+
+5. **Account Settings & Complete Data Sovereignty**:
+   - Customize display name and mindful avatar.
+   - Adjust voice synthesis parameters (pitch, speed rate, ambient background audio).
+   - Immutable email display to preserve identity integrity.
+   - Full GDPR-compliant account deletion workflow with complete Firestore interaction wipes and client-side credential clearing.
+
+6. **Canvas Cursor Wave Effect**:
+   - Interactive background mathematical fluid ripple tracking cursor and touch movements without layout shifts or horizontal overflow.
+
+---
+
 ## Technologies Used
 
 ### Frontend
@@ -81,10 +113,11 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
 | **React 19** | Core component rendering and modern React hook primitives. |
 | **TypeScript 5.8** | Full-stack end-to-end type safety and interface definitions. |
 | **Vite 6** | Ultra-fast local development server and optimized build tooling. |
-| **Tailwind CSS v4** | Next-generation CSS styling using custom theme properties and fluid utility classes. |
+| **Tailwind CSS v4** | Modern styling using fluid utility classes, CSS variables, and zero-overflow containers. |
 | **Motion (Framer Motion 12)** | Physics-based animations for cards, drawers, and status indicators. |
 | **Lucide React** | Consistent, lightweight SVG icon system. |
 | **HTML5 Canvas API** | Lightweight mathematical cursor ripple wave background visualizer. |
+| **@vis.gl/react-google-maps** | Interactive map rendering for location-tagged sanctuaries. |
 
 ### Backend & AI
 | Technology | Purpose |
@@ -105,21 +138,29 @@ ReflectAI Sanctuary was created to bridge modern cognitive journaling practices 
 
 ---
 
-## Recommended License
+## Required Environment Keys & Secrets
 
-For this application, the **MIT License** is strongly recommended.
+To run the application locally or deploy it to Google Cloud Run, the following keys are used:
 
-### Why the MIT License?
-1. **Developer-Friendly & Permissive**: Anyone can run, fork, modify, commercialize, or integrate the application with minimal legal friction.
-2. **Standard for Modern Web Apps**: Recognized globally by open-source communities, corporate engineering teams, and cloud platforms.
-3. **Comprehensive Liability Protection**: Contains an explicit disclaimer stating that the software is provided "AS IS", shielding the author from liability or warranty claims.
-4. **Simple & Understandable**: Fits in a single short page without complicated patent clauses or restrictive copyleft requirements (like GPL).
+### Summary of Keys
 
-The repository includes the full MIT license in the [LICENSE](./LICENSE) file.
+| Key Name | Location | Required / Optional | Purpose |
+| :--- | :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Server-Side / Secret Manager | **Required** | Access to Gemini 3.6 Flash for cognitive reflection, time capsule synthesis, and follow-ups. |
+| `APP_ENV` | Server-Side / Cloud Run Env | **Required** | Sets environment: `'test'` (enables developer tools & sandbox) or `'production'` (locks to live mode). |
+| `VITE_FIREBASE_API_KEY` | Client-Side / `.env` | **Required** | Firebase Web API key for authentication and Firestore access. |
+| `VITE_FIREBASE_PROJECT_ID` | Client-Side / `.env` | **Required** | Firebase project ID. |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Client-Side / `.env` | **Required** | Firebase Authentication domain (`<project-id>.firebaseapp.com`). |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Client-Side / `.env` | Optional | Firebase Storage bucket for avatars/attachments. |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Client-Side / `.env` | Optional | Firebase cloud messaging sender ID. |
+| `VITE_FIREBASE_APP_ID` | Client-Side / `.env` | Optional | Firebase web application identifier. |
+| `VITE_GOOGLE_MAPS_API_KEY` | Client-Side / `.env` | Optional | Google Maps Platform API key for interactive sanctuary maps (falls back gracefully if omitted). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Server-Side / `.env` | Optional | SMTP credentials for automated email dispatch. |
+| `RESEND_API_KEY` | Server-Side / `.env` | Optional | Alternative email delivery service API key. |
 
 ---
 
-## Local Development Guide
+## Local Development Guide (Run Locally)
 
 Follow these steps to run ReflectAI Sanctuary on your local workstation:
 
@@ -168,6 +209,9 @@ VITE_FIREBASE_PROJECT_ID="your-project-id"
 VITE_FIREBASE_STORAGE_BUCKET="your-project.appspot.com"
 VITE_FIREBASE_MESSAGING_SENDER_ID="1234567890"
 VITE_FIREBASE_APP_ID="1:1234567890:web:abcdef"
+
+# Google Maps Platform (Optional)
+VITE_GOOGLE_MAPS_API_KEY=""
 ```
 
 ### 5. Start the Development Server
@@ -175,25 +219,25 @@ VITE_FIREBASE_APP_ID="1:1234567890:web:abcdef"
 npm run dev
 ```
 
-Visit **`http://localhost:3000`** in your browser. The application is immediately available.
+Visit **`http://localhost:3000`** in your browser. The application boots with hot reloading and server proxying.
 
-### 6. Verification Commands
+### 6. Build and Run Production Locally
 ```bash
 # Type check with TypeScript compiler
 npm run lint
 
-# Build production bundle and bundle server with esbuild
+# Build production client bundle and bundle server.ts with esbuild into dist/server.cjs
 npm run build
 
-# Run production build locally
+# Launch the compiled CommonJS server
 npm run start
 ```
 
 ---
 
-## Cloud Run Deployment Guide
+## Google Cloud Run Deployment Guide
 
-Deploying directly to Google Cloud Run gives you a fully managed, auto-scaling, HTTPS-secured instance.
+Deploying directly to Google Cloud Run gives you a fully managed, auto-scaling, HTTPS-secured instance on Google Cloud infrastructure.
 
 ### Step 1: Install & Initialize Google Cloud CLI
 ```bash
@@ -266,10 +310,10 @@ gcloud run deploy reflectai \
 
 > **Why `--allow-unauthenticated` is standard for public web apps:**
 > In Google Cloud Run, `--allow-unauthenticated` controls **Cloud Run IAM ingress** (network layer), allowing public web browsers to reach the website over HTTPS. 
-> - **With `--allow-unauthenticated`**: Normal visitors can access the login page and authenticate using Firebase (Google/LinkedIn/Facebook/Email). All data is protected by Firestore Security Rules and server-side secret isolation.
-> - **With `--no-allow-unauthenticated`**: Cloud Run blocks all public web traffic. Only callers possessing Google Cloud IAM credentials or Google Cloud Identity-Aware Proxy (IAP) can reach the container. (Use this option only if building an internal enterprise tool restricted to corporate employees).
+> - **With `--allow-unauthenticated`**: Normal visitors can access the login page and authenticate using Firebase (Google/LinkedIn/Twitter/Email). All data is protected by Firestore Security Rules and server-side secret isolation.
+> - **With `--no-allow-unauthenticated`**: Cloud Run blocks all public web traffic. Only callers possessing Google Cloud IAM credentials or Google Cloud Identity-Aware Proxy (IAP) can reach the container.
 
-### Step 4: (Optional) Injecting Firebase Configuration at Runtime
+### Step 5: (Optional) Injecting Firebase Configuration at Runtime
 You can pass your Firebase project keys directly via Cloud Run environment variables without rebuilding the container:
 
 ```bash
@@ -278,7 +322,7 @@ gcloud run services update reflectai \
   --update-env-vars FIREBASE_API_KEY=YOUR_FIREBASE_WEB_API_KEY,FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
 ```
 
-### Step 5: Add Campaign Challenge Label
+### Step 6: Add Campaign Challenge Label
 ```bash
 gcloud run services update reflectai \
   --update-labels=dev-tutorial=cloud-run-ai-challenge \
@@ -287,7 +331,7 @@ gcloud run services update reflectai \
 
 ---
 
-## 7. Fast Re-deployment & Git Update Workflow
+## Fast Re-deployment & Git Update Workflow
 
 ### How Cloud Run Preserves Your Secrets & Configuration
 > **Important Concept**: In Google Cloud Run, your secrets (from Secret Manager) and environment variables are attached to the **Cloud Run Service Definition**. 
@@ -336,7 +380,7 @@ To adhere to enterprise security standards, never commit secrets to source contr
 gcloud secrets create GEMINI_API_KEY --replication-policy="automatic"
 echo -n "YOUR_ACTUAL_GEMINI_API_KEY" | gcloud secrets versions add GEMINI_API_KEY --data-file=-
 
-# (Optional) Create email service secret for SMTP or Resend
+# (Optional) Create email service secret for SMTP
 gcloud secrets create SMTP_PASS --replication-policy="automatic"
 echo -n "YOUR_EMAIL_APP_PASSWORD" | gcloud secrets versions add SMTP_PASS --data-file=-
 ```
@@ -367,7 +411,7 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Isolated reflections, interactions, and AI responses
+    // Isolated reflections, interactions, time capsules, and AI responses
     match /users/{userId}/interactions/{interactionId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
@@ -404,7 +448,7 @@ firebase deploy --only firestore:rules
 
 ### 3. Twitter / X Sign-In Setup
 
-Twitter (X) OAuth requires no business verification and can be configured seamlessly using Firebase Authentication:
+Twitter (X) OAuth can be configured seamlessly using Firebase Authentication:
 
 1. Log in to the [X Developer Portal](https://developer.x.com/en/portal/dashboard) (ensure your X account has a verified email and phone number).
 2. Create a Project / App (or select your existing App under Projects & Apps).
@@ -413,17 +457,31 @@ Twitter (X) OAuth requires no business verification and can be configured seamle
    - **Type of App**: Select **Web App, Automated App or Bot**.
    - **Callback URI / Redirect URL**:
      ```text
-     https://genai-cohort3-ideathon.firebaseapp.com/__/auth/handler
+     https://<project-id>.firebaseapp.com/__/auth/handler
      ```
    - **Website URL**: Enter your deployed Cloud Run URL (`https://reflectai-952579076488.asia-south1.run.app`).
    - Click **Save**.
 4. In your App settings, navigate to the **Keys and tokens** tab:
    - Under **Consumer Keys**, copy (or regenerate) the **API Key** and **API Secret**.
-5. Open [Firebase Console &rarr; Authentication &rarr; Sign-in method](https://console.firebase.google.com/project/genai-cohort3-ideathon/authentication/providers):
+5. Open [Firebase Console &rarr; Authentication &rarr; Sign-in method](https://console.firebase.google.com/):
    - Under **Additional providers**, click **Twitter**.
    - Toggle **Enable**.
    - Paste the **API Key** and **API Secret** from the X Developer Portal.
    - Click **Save**.
+
+---
+
+## Recommended License
+
+For this application, the **MIT License** is strongly recommended.
+
+### Why the MIT License?
+1. **Developer-Friendly & Permissive**: Anyone can run, fork, modify, commercialize, or integrate the application with minimal legal friction.
+2. **Standard for Modern Web Apps**: Recognized globally by open-source communities, corporate engineering teams, and cloud platforms.
+3. **Comprehensive Liability Protection**: Contains an explicit disclaimer stating that the software is provided "AS IS", shielding the author from liability or warranty claims.
+4. **Simple & Understandable**: Fits in a single short page without complicated patent clauses or restrictive copyleft requirements (like GPL).
+
+The repository includes the full MIT license in the [LICENSE](./LICENSE) file.
 
 ---
 
@@ -433,18 +491,18 @@ The following step-by-step test matrix verifies every critical user interaction 
 
 | Test Case | Step-by-Step Actions | Expected Result |
 | :--- | :--- | :--- |
-| **1. Mobile Responsive UI** | Open the app in a mobile viewport (<640px). | The header shows compact icons (`🧪`/`🚀`, `Sun`/`Moon`, Palette dot) without horizontal overflow or text wrapping. |
+| **1. Mobile Responsive UI (No Horizontal Scroll)** | Open the app in any mobile viewport (320px to 640px). Scroll in all directions. | Viewport remains strictly fixed with zero horizontal scrolling. Header displays compact 4-bit elements with a consolidated enhancements menu (`Wand2`), avatar, settings, and theme toggles. |
 | **2. Production Environment Locking** | Deploy with `APP_ENV=production` or click the `🚀` mode button. | The test sandbox card is removed, the `🧪`/`🚀` switcher is hidden, and the **SSL Encrypted** badge is displayed. |
 | **3. Email Sign-Up & Verification Link** | Enter email/password on Sign Up and click **Create Sanctuary Account**. | Account registers in Firebase; Google Firebase dispatches a verification link to your inbox; sanctuary dashboard shows the verification banner until verified. |
 | **4. Polite Email Verification Gate** | With an unverified email account, try submitting a reflection in the composer or clicking a suggestion chip. | A polite modal dialog appears explaining that email verification is required to converse with the AI, with buttons to resend the link or confirm verification. |
 | **5. AI Reflection & Follow-Up Chips** | Submit a reflection prompt in the composer. | AI returns a thoughtful response with emotional mood categorization; 3 intelligent follow-up suggestions appear. Typing in composer immediately clears suggestions. |
-| **6. Sanctuary Voice Mode (Speech-to-Text)** | Click the microphone icon in the composer, speak a reflection, and click stop. | Browser SpeechRecognition transcribes your words directly into the reflection textarea in real-time. |
+| **6. Sanctuary Voice Mode (Speech-to-Text)** | Click the microphone icon in the composer, speak a reflection, and click stop. | Browser SpeechRecognition transcribes your words directly into the reflection textarea in real-time. Any microphone permission errors auto-dismiss or dismiss on click without horizontal overflow. |
 | **7. Sanctuary Audio Narration & 432Hz Drone** | Click the audio play button on any AI reflection response bubble. | Peaceful speech synthesis reads the reflection aloud accompanied by a soothing 432Hz binaural drone with live playback waves. |
 | **8. Serenity Time Capsule** | In the composer or header, click **Capsule**, choose 7/30/90/365 days, and seal the active reflection. | The reflection is locked into the Time Capsule Vault. Clicking **Unseal** triggers Gemini 3.6 Flash to analyze personal growth, celebrating emergent strengths. |
-| **9. Echoes of Mind (Resonance Map)** | Click **Echoes** in the top navigation. | Interactive visual canvas renders reflections as emotional nodes (Calm, Clarity, Gratitude, Courage, Growth, Reflective) with connecting resonance links and mood statistics. |
+| **9. Echoes of Mind (Resonance Map)** | Click **Echoes** in the top navigation or mobile menu. | Interactive visual canvas renders reflections as emotional nodes (Calm, Clarity, Gratitude, Courage, Growth, Reflective) with connecting resonance links and mood statistics. |
 | **10. Location-Aware Sanctuary Journey** | Click **Sanctuaries** in header or **Tag Location** in composer. Tag GPS coordinates or select a sanctuary preset (e.g. Kyoto Bamboo Grove, Big Sur). | Physical coordinates and sanctuary landmark are pinned on the interactive Google Map and attached to the reflection. |
 | **11. Account Settings & Profile Update** | Click the Settings icon in the header next to the avatar. Update display name, pick an avatar, adjust voice sliders, and save. | Profile changes reflect across the dashboard immediately and persist to user profile storage. Email address is permanently locked and uneditable. |
-| **12. Account Deletion & Firestore Data Wipe** | In Settings &rarr; **Delete Account**, type `DELETE` and click **Permanently Delete My Sanctuary**. | All user interactions, time capsules, and profile documents are wiped clean from Cloud Firestore, and the session is signed out safely. |
+| **12. Account Deletion & Firestore Data Wipe** | In Settings &rarr; **Delete Account**, type `DELETE` and click **Permanently Delete My Sanctuary**. | All user interactions, time capsules, and profile documents are wiped clean from Cloud Firestore, and the session is signed out safely with a locked screen blocker during processing. |
 | **13. Secret Key Isolation** | Inspect browser network requests to `/api/config` or client source. | The `GEMINI_API_KEY` is completely absent from browser bundles; all generative AI calls proxy securely through server-side `/api/gemini/*` endpoints. |
 
 ---

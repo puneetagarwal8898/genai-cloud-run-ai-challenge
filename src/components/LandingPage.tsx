@@ -164,7 +164,7 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col font-sans transition-colors duration-300"
+      className="min-h-screen w-full max-w-full overflow-x-hidden flex flex-col font-sans transition-colors duration-300"
       style={{
         backgroundColor: 'var(--bg-canvas)',
         color: 'var(--text-primary)'

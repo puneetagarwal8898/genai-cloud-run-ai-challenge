@@ -84,7 +84,7 @@ export const ThemeSelector: React.FC = () => {
         <div
           role="menu"
           aria-label="Color Themes"
-          className="absolute right-0 mt-2 w-72 rounded-2xl border shadow-2xl p-2.5 z-50 backdrop-blur-md"
+          className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-2xl border shadow-2xl p-2.5 z-50 backdrop-blur-md"
           style={{
             backgroundColor: 'var(--bg-card-elevated)',
             borderColor: 'var(--border-color)',

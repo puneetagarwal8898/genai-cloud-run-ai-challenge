@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, AlertCircle, X } from 'lucide-react';
 
 interface SanctuaryVoiceInputProps {
   onTranscriptChange: (transcript: string) => void;
@@ -15,9 +15,39 @@ export const SanctuaryVoiceInput: React.FC<SanctuaryVoiceInputProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const errorTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
   const currentValueRef = useRef<string>(currentValue);
   const onTranscriptChangeRef = useRef(onTranscriptChange);
+
+  // Clear timer on unmount
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+      }
+    };
+  }, []);
+
+  const triggerError = (msg: string) => {
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+    }
+    setErrorMessage(msg);
+    // Automatically disappear after 4 seconds
+    errorTimerRef.current = setTimeout(() => {
+      setErrorMessage(null);
+      errorTimerRef.current = null;
+    }, 4000);
+  };
+
+  const dismissError = () => {
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+    setErrorMessage(null);
+  };
 
   useEffect(() => {
     currentValueRef.current = currentValue;
@@ -61,7 +91,13 @@ export const SanctuaryVoiceInput: React.FC<SanctuaryVoiceInputProps> = ({
     recognition.onerror = (event: any) => {
       console.warn('Speech recognition event:', event.error);
       if (event.error === 'not-allowed') {
-        setErrorMessage('Microphone access permission was denied.');
+        triggerError('Microphone access permission was denied.');
+      } else if (event.error === 'service-not-allowed') {
+        triggerError('Microphone service is not allowed.');
+      } else if (event.error === 'no-speech') {
+        // Silent timeout or no speech detected, do not spam
+      } else {
+        triggerError(`Speech error: ${event.error}`);
       }
       setIsListening(false);
     };
@@ -81,7 +117,7 @@ export const SanctuaryVoiceInput: React.FC<SanctuaryVoiceInputProps> = ({
 
   const toggleListening = () => {
     if (disabled || !recognitionRef.current) return;
-    setErrorMessage(null);
+    dismissError();
 
     if (isListening) {
       recognitionRef.current.stop();
@@ -92,6 +128,7 @@ export const SanctuaryVoiceInput: React.FC<SanctuaryVoiceInputProps> = ({
         setIsListening(true);
       } catch (err: any) {
         console.warn('Speech recognition start note:', err);
+        triggerError('Could not start microphone.');
       }
     }
   };
@@ -127,9 +164,20 @@ export const SanctuaryVoiceInput: React.FC<SanctuaryVoiceInputProps> = ({
       </button>
 
       {errorMessage && (
-        <div className="absolute bottom-full left-0 mb-2 p-2 bg-rose-900 text-rose-100 text-[11px] rounded-lg shadow-lg whitespace-nowrap flex items-center gap-1.5 z-20">
-          <AlertCircle className="w-3.5 h-3.5" />
-          {errorMessage}
+        <div
+          role="alert"
+          className="absolute bottom-full left-0 mb-2 p-2 px-2.5 bg-rose-900 text-rose-100 text-[11px] rounded-lg shadow-lg max-w-[calc(100vw-3rem)] sm:max-w-xs flex items-center gap-2 z-30 animate-in fade-in slide-in-from-bottom-1 duration-150"
+        >
+          <AlertCircle className="w-3.5 h-3.5 text-rose-300 shrink-0" />
+          <span className="break-words leading-tight">{errorMessage}</span>
+          <button
+            type="button"
+            onClick={dismissError}
+            className="p-0.5 rounded hover:bg-rose-800 text-rose-300 hover:text-rose-100 cursor-pointer ml-1 shrink-0"
+            title="Dismiss error"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
     </div>

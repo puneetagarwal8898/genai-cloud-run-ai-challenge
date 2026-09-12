@@ -40,7 +40,7 @@ function MainApp() {
   }
 
   return (
-    <>
+    <div className="w-full max-w-full overflow-x-hidden min-h-screen relative flex flex-col">
       <CursorWaveEffect />
       {user ? <Dashboard /> : <LandingPage />}
       {isDeletingAccount && (
@@ -76,7 +76,7 @@ function MainApp() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

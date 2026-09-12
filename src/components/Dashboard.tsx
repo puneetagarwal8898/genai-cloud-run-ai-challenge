@@ -24,7 +24,11 @@ import {
   Mail,
   Sliders,
   MapPin,
-  HelpCircle
+  HelpCircle,
+  Wand2,
+  ChevronDown,
+  Plus,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -44,6 +48,7 @@ import { LegalModal } from './LegalModal';
 import { AudioNarrationPlayer } from './AudioNarrationPlayer';
 import { SanctuaryVoiceInput } from './SanctuaryVoiceInput';
 import { InfoTooltip } from './InfoTooltip';
+import { ResponsiveIconButton } from './ResponsiveIconButton';
 
 // Thoughtful, joyful reflections while the AI is reflecting
 const THINKING_PHRASES = [
@@ -100,16 +105,148 @@ export const Dashboard: React.FC = () => {
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
   const [showLegalModal, setShowLegalModal] = useState<boolean>(false);
+  const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms'>('privacy');
   const [navigatedFromSettings, setNavigatedFromSettings] = useState<boolean>(false);
   const [stagedLocation, setStagedLocation] = useState<SanctuaryLocation | null>(null);
+  const [showMobileEnhancements, setShowMobileEnhancements] = useState<boolean>(false);
+  const mobileEnhancementsRef = useRef<HTMLDivElement | null>(null);
+  const [showMobileProfileMenu, setShowMobileProfileMenu] = useState<boolean>(false);
+  const mobileProfileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close mobile profile dropdown menu on outside click or Escape
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        mobileProfileMenuRef.current &&
+        !mobileProfileMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowMobileProfileMenu(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showMobileProfileMenu) {
+        setShowMobileProfileMenu(false);
+      }
+    };
+    if (showMobileProfileMenu) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMobileProfileMenu]);
+
+  // Close mobile enhancements menu on outside click or Escape
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        mobileEnhancementsRef.current &&
+        !mobileEnhancementsRef.current.contains(e.target as Node)
+      ) {
+        setShowMobileEnhancements(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showMobileEnhancements) {
+        setShowMobileEnhancements(false);
+      }
+    };
+    if (showMobileEnhancements) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMobileEnhancements]);
 
   // Email verification gate: email auth accounts require emailVerified: true to converse
   const isEmailUnverified = userProfile?.authProvider === 'email' && !userProfile?.emailVerified;
 
+  // Responsive UI state: Hide button labels synchronously across the cluster if space is constrained or text doesn't fit
+  const [showModeLabels, setShowModeLabels] = useState<boolean>(true);
+  const [showHeaderNavLabels, setShowHeaderNavLabels] = useState<boolean>(true);
+  const [showComposerActionLabels, setShowComposerActionLabels] = useState<boolean>(true);
+  const modeBarContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerNavContainerRef = useRef<HTMLDivElement | null>(null);
+  const composerActionsContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-adjust layout & responsiveness: monitor container widths and font-scaling
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    // Observe Reflection Modes Bar container
+    const modeObserver = new ResizeObserver(() => {
+      if (modeBarContainerRef.current) {
+        // Measure whether the container is cramped or if font size is enlarged.
+        // 4 mode buttons with full text take ~420px to render comfortably without any clipping.
+        // If parent container width is under 440px, gracefully collapse ALL mode buttons to icons only.
+        const containerWidth = modeBarContainerRef.current.clientWidth;
+        setShowModeLabels(containerWidth >= 440);
+      }
+    });
+
+    if (modeBarContainerRef.current) {
+      modeObserver.observe(modeBarContainerRef.current);
+    }
+
+    // Observe Desktop Header Nav container
+    const headerObserver = new ResizeObserver(() => {
+      if (headerNavContainerRef.current) {
+        const containerWidth = headerNavContainerRef.current.clientWidth;
+        // 4 nav buttons with text + tooltips take ~500px at default font size
+        setShowHeaderNavLabels(containerWidth >= 500);
+      }
+    });
+
+    if (headerNavContainerRef.current) {
+      headerObserver.observe(headerNavContainerRef.current);
+    }
+
+    // Observe Composer Actions container (Mic, Tag Place, Time Capsule)
+    const composerActionsObserver = new ResizeObserver(() => {
+      if (composerActionsContainerRef.current) {
+        const containerWidth = composerActionsContainerRef.current.clientWidth;
+        // When space is constrained (under 280px), synchronize collapsing both buttons to icons only
+        setShowComposerActionLabels(containerWidth >= 280);
+      }
+    });
+
+    if (composerActionsContainerRef.current) {
+      composerActionsObserver.observe(composerActionsContainerRef.current);
+    }
+
+    return () => {
+      modeObserver.disconnect();
+      headerObserver.disconnect();
+      composerActionsObserver.disconnect();
+    };
+  }, []);
+
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const currentUserId = user?.uid || userProfile?.uid || '';
 
-  // Rotate thinking phrases gently during thinking
+  // Handle Escape key to dismiss modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showVerifyModal) setShowVerifyModal(false);
+        if (showLocationModal) setShowLocationModal(false);
+        if (showTimeCapsule) setShowTimeCapsule(false);
+        if (showResonanceMap) setShowResonanceMap(false);
+        if (showSettingsModal) setShowSettingsModal(false);
+        if (showAboutModal) setShowAboutModal(false);
+        if (showLegalModal) setShowLegalModal(false);
+        if (showMobileProfileMenu) setShowMobileProfileMenu(false);
+        if (deletingEntryId) setDeletingEntryId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showVerifyModal, showLocationModal, showTimeCapsule, showResonanceMap, showSettingsModal, showAboutModal, showLegalModal, showMobileProfileMenu, deletingEntryId]);
   useEffect(() => {
     if (!isSubmitting) return;
     const interval = setInterval(() => {
@@ -291,7 +428,9 @@ export const Dashboard: React.FC = () => {
 
       // Create full interaction record with standout feature attributes
       const detectedMood = (data.mood as SanctuaryMood) || 'reflective';
-      const interactionLocation = stagedLocation || (interactions.find(i => i.id === interactionId)?.location);
+      const existingItem = interactions.find(i => i.id === interactionId);
+      const interactionLocation = stagedLocation || existingItem?.location;
+      const existingTimeCapsule = existingItem?.timeCapsule;
 
       const fullInteraction: JournalInteraction = {
         id: interactionId,
@@ -303,9 +442,10 @@ export const Dashboard: React.FC = () => {
         mode,
         mood: detectedMood,
         location: interactionLocation,
+        timeCapsule: existingTimeCapsule,
         suggestedPrompts: newSuggestedPrompts,
         trail: finalTrail,
-        createdAt: isNewChat ? now : (interactions.find(i => i.id === interactionId)?.createdAt || now),
+        createdAt: isNewChat ? now : (existingItem?.createdAt || now),
         updatedAt: now
       };
 
@@ -462,7 +602,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col font-sans selection:bg-[var(--accent-light)]"
+      className="min-h-screen w-full max-w-full overflow-x-hidden flex flex-col font-sans selection:bg-[var(--accent-light)]"
       style={{ backgroundColor: 'var(--bg-canvas)', color: 'var(--text-secondary)' }}
     >
       {/* Top Application Bar */}
@@ -531,167 +671,497 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick theme selector and light/dark toggle */}
+        <div className="flex items-center gap-2 sm:gap-3 pl-3 sm:pl-4">
+          {/* Quick theme selector and light/dark toggle (visible on all screens) */}
           <ThemeSelector />
 
-          {/* Standout Features Nav Cluster */}
-          <div className="hidden lg:flex items-center gap-2 pl-1.5 border-l" style={{ borderColor: 'var(--border-color)' }}>
-            <button
+          {/* Desktop Standout Features Nav Cluster (hidden on mobile / small screens) */}
+          <div
+            ref={headerNavContainerRef}
+            className="hidden lg:flex items-center gap-2 pl-1.5 border-l"
+            style={{ borderColor: 'var(--border-color)' }}
+          >
+            <ResponsiveIconButton
               id="open-resonance-map-btn"
-              type="button"
+              icon={<Compass className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+              label="Thought Map"
+              description="See a sky map of your thoughts mapped by reflection moods"
+              showText={showHeaderNavLabels}
               onClick={() => setShowResonanceMap(true)}
-              aria-label="Thought Map - Echoes of Mind"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              ariaLabel="Thought Map - Echoes of Mind"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:opacity-90"
               style={{
                 backgroundColor: 'var(--bg-card-elevated)',
                 borderColor: 'var(--border-color)',
                 color: 'var(--text-primary)'
               }}
-            >
-              <Compass className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span>Thought Map</span>
-              <InfoTooltip
-                asSpan
-                size="sm"
-                text="See a sky map of your thoughts mapped by how you felt when writing (Calm, Gratitude, Clarity, etc.)."
-              />
-            </button>
+              badge={
+                showHeaderNavLabels ? (
+                  <InfoTooltip
+                    asSpan
+                    size="sm"
+                    text="See a sky map of your thoughts mapped by how you felt when writing (Calm, Gratitude, Clarity, etc.)."
+                  />
+                ) : undefined
+              }
+            />
 
-            <button
+            <ResponsiveIconButton
               id="open-time-capsule-btn"
-              type="button"
+              icon={<Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+              label="Time Capsule"
+              description="Lock letters to your future self and re-open later"
+              showText={showHeaderNavLabels}
               onClick={() => setShowTimeCapsule(true)}
-              aria-label="Time Capsule - Letters to your future self"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              ariaLabel="Time Capsule - Letters to your future self"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:opacity-90"
               style={{
                 backgroundColor: 'var(--bg-card-elevated)',
                 borderColor: 'var(--border-color)',
                 color: 'var(--text-primary)'
               }}
-            >
-              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span>Time Capsule</span>
-              <InfoTooltip
-                asSpan
-                size="sm"
-                text="Lock away a journal entry to open in 7, 30, 90, or 365 days, and discover how you've grown."
-              />
-            </button>
+              badge={
+                showHeaderNavLabels ? (
+                  <InfoTooltip
+                    asSpan
+                    size="sm"
+                    text="Lock away a journal entry to open in 7, 30, 90, or 365 days, and discover how you've grown."
+                  />
+                ) : undefined
+              }
+            />
 
-            <button
+            <ResponsiveIconButton
               id="open-location-sanctuary-btn"
-              type="button"
+              icon={<MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+              label="Peaceful Places"
+              description="Attach real-world tranquil spots to reflections"
+              showText={showHeaderNavLabels}
               onClick={() => setShowLocationModal(true)}
-              aria-label="Peaceful Places - Tag a location"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              ariaLabel="Peaceful Places - Tag a location"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:opacity-90"
               style={{
                 backgroundColor: 'var(--bg-card-elevated)',
                 borderColor: 'var(--border-color)',
                 color: 'var(--text-primary)'
               }}
-            >
-              <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span>Peaceful Places</span>
-              <InfoTooltip
-                asSpan
-                size="sm"
-                text="Attach a real-world tranquil spot where you wrote your reflection, like a quiet park, favorite cafe, or porch."
-              />
-            </button>
+              badge={
+                showHeaderNavLabels ? (
+                  <InfoTooltip
+                    asSpan
+                    size="sm"
+                    text="Attach a real-world tranquil spot where you wrote your reflection, like a quiet park, favorite cafe, or porch."
+                  />
+                ) : undefined
+              }
+            />
 
-            <button
+            <ResponsiveIconButton
               id="open-about-modal-header-btn"
-              type="button"
+              icon={<HelpCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+              label="About"
+              description="Learn more about Sanctuary, security, and FAQ"
+              showText={showHeaderNavLabels}
               onClick={() => {
                 setNavigatedFromSettings(false);
                 setShowAboutModal(true);
               }}
-              aria-label="About Sanctuary & FAQ"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer hover:opacity-90 group"
+              ariaLabel="About Sanctuary & FAQ"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:opacity-90"
               style={{
                 backgroundColor: 'var(--bg-card-elevated)',
                 borderColor: 'var(--border-color)',
                 color: 'var(--text-primary)'
               }}
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span>About</span>
-              <InfoTooltip
-                asSpan
-                size="sm"
-                text="Learn more about Sanctuary, security safeguards, zero-knowledge architecture, and frequently asked questions."
-              />
-            </button>
+              badge={
+                showHeaderNavLabels ? (
+                  <InfoTooltip
+                    asSpan
+                    size="sm"
+                    text="Learn more about Sanctuary, security safeguards, zero-knowledge architecture, and frequently asked questions."
+                  />
+                ) : undefined
+              }
+            />
           </div>
 
-          <button
-            id="new-entry-btn-header"
-            onClick={startNewEntry}
-            className="hidden sm:inline-flex px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all items-center gap-1.5 shadow-xs cursor-pointer hover:opacity-90"
-            style={{
-              backgroundColor: 'var(--accent)',
-              boxShadow: '0 0 12px var(--accent-glow)'
-            }}
-          >
-            <span>+ New Reflection</span>
-          </button>
-
-          <div
-            className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l shrink-0"
-            style={{ borderColor: 'var(--border-color)' }}
-          >
-            {userProfile?.photoURL ? (
-              <img
-                src={userProfile.photoURL}
-                alt={userProfile.displayName || "User"}
-                referrerPolicy="no-referrer"
-                className="w-7 h-7 rounded-full object-cover border shrink-0"
-                style={{ borderColor: 'var(--border-color)' }}
-              />
-            ) : (
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
-                style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
-              >
-                <UserIcon className="w-3.5 h-3.5" />
-              </div>
-            )}
-            <div className="hidden md:block text-left w-[110px] lg:w-[130px] shrink-0">
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-semibold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
-                  {userProfile?.displayName || "Reflector"}
-                </p>
-                {userProfile?.emailVerified && (
-                  <span title="Verified Account" className="text-emerald-500 shrink-0">
-                    <CheckCircle2 className="w-3 h-3" />
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Account Settings Modal Trigger */}
+          {/* Mobile Enhancements Dropdown Menu (Bit 1 for Mobile: 1 icon opening menu with all features) */}
+          <div className="relative lg:hidden" ref={mobileEnhancementsRef}>
             <button
-              id="open-settings-modal-btn"
+              id="mobile-enhancements-btn"
               type="button"
-              onClick={() => setShowSettingsModal(true)}
-              title="Account Settings & Preferences"
-              className="p-1.5 rounded-lg border transition cursor-pointer hover:opacity-85"
+              aria-label="Sanctuary Enhancements & Tools"
+              aria-expanded={showMobileEnhancements}
+              aria-haspopup="menu"
+              title="Enhancements & Tools"
+              onClick={() => setShowMobileEnhancements(!showMobileEnhancements)}
+              className="p-1.5 rounded-lg border transition-all flex items-center justify-center cursor-pointer hover:opacity-90"
               style={{
-                backgroundColor: 'var(--bg-input)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-primary)'
+                backgroundColor: showMobileEnhancements ? 'var(--accent-light)' : 'var(--bg-input)',
+                borderColor: showMobileEnhancements ? 'var(--accent)' : 'var(--border-color)',
+                color: showMobileEnhancements ? 'var(--accent)' : 'var(--text-primary)'
               }}
             >
-              <Sliders className="w-3.5 h-3.5" />
+              <Wand2 className="w-4 h-4 text-amber-500" />
             </button>
+
+            {showMobileEnhancements && (
+              <div
+                role="menu"
+                aria-label="Sanctuary Features"
+                className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] rounded-2xl border shadow-2xl p-2 z-50 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150"
+                style={{
+                  backgroundColor: 'var(--bg-card-elevated)',
+                  borderColor: 'var(--border-color)',
+                  boxShadow: '0 20px 40px -15px rgba(0,0,0,0.5)'
+                }}
+              >
+                <div className="px-2 py-1.5 mb-1 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider font-mono text-amber-500">
+                    Enhancements & Tools
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}>
+                    Sanctuary
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileEnhancements(false);
+                      setShowResonanceMap(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <Compass className="w-3.5 h-3.5 text-amber-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">Thought Map</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Sky map of your reflection moods
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileEnhancements(false);
+                      setShowTimeCapsule(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">Time Capsule</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Lock letters to your future self
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileEnhancements(false);
+                      setShowLocationModal(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">Peaceful Places</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Attach real tranquil locations
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileEnhancements(false);
+                      setNavigatedFromSettings(false);
+                      setShowAboutModal(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">About & FAQ</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Safeguards & zero-knowledge
+                      </p>
+                    </div>
+                  </button>
+
+                  <div className="pt-1 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowMobileEnhancements(false);
+                        startNewEntry();
+                      }}
+                      className="w-full text-center py-2 px-3 rounded-xl text-xs font-medium text-white transition cursor-pointer flex items-center justify-center gap-1.5"
+                      style={{ backgroundColor: 'var(--accent)' }}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>+ New Reflection</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* User profile identifier (Mobile: clickable icon button showing avatar only; Desktop: full profile info + direct buttons) */}
+          <div className="relative shrink-0" ref={mobileProfileMenuRef}>
+            <button
+              id="mobile-profile-menu-btn"
+              type="button"
+              aria-label={`Profile menu: ${userProfile?.displayName || "Reflector"}`}
+              aria-haspopup="menu"
+              aria-expanded={showMobileProfileMenu}
+              onClick={() => setShowMobileProfileMenu(!showMobileProfileMenu)}
+              className="flex md:hidden items-center justify-center p-1 rounded-xl border transition cursor-pointer hover:opacity-90 active:scale-95"
+              style={{
+                borderColor: showMobileProfileMenu ? 'var(--accent)' : 'var(--border-color)',
+                backgroundColor: showMobileProfileMenu ? 'var(--accent-light)' : 'transparent'
+              }}
+              title={`${userProfile?.displayName || "Reflector"} - Account options`}
+            >
+              {userProfile?.photoURL ? (
+                <img
+                  src={userProfile.photoURL}
+                  alt={userProfile.displayName || "User"}
+                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 rounded-full object-cover border shrink-0"
+                  style={{ borderColor: 'var(--border-color)' }}
+                />
+              ) : (
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                >
+                  <UserIcon className="w-3.5 h-3.5" />
+                </div>
+              )}
+            </button>
+
+            {/* Mobile Profile Dropdown Menu - clamped safely with fixed/absolute right-0 to prevent any clipping */}
+            {showMobileProfileMenu && (
+              <div
+                role="menu"
+                aria-label="Profile and Session Menu"
+                className="md:hidden absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-2xl border shadow-2xl p-2.5 z-50 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150"
+                style={{
+                  backgroundColor: 'var(--bg-card-elevated)',
+                  borderColor: 'var(--border-color)',
+                  boxShadow: '0 20px 40px -15px rgba(0,0,0,0.5)'
+                }}
+              >
+                {/* Person's name and email clearly displayed inside the menu */}
+                <div className="px-3 py-2.5 mb-1.5 rounded-xl border flex items-center gap-2.5" style={{ backgroundColor: 'var(--bg-canvas)', borderColor: 'var(--border-color)' }}>
+                  {userProfile?.photoURL ? (
+                    <img
+                      src={userProfile.photoURL}
+                      alt={userProfile.displayName || "User"}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-full object-cover border shrink-0"
+                      style={{ borderColor: 'var(--border-color)' }}
+                    />
+                  ) : (
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 font-medium"
+                      style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
+                    >
+                      <UserIcon className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold truncate leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {userProfile?.displayName || "Reflector"}
+                    </p>
+                    <p className="text-[10px] truncate leading-tight mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {userProfile?.email || "Private Session"}
+                    </p>
+                    {userProfile?.emailVerified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-medium mt-1">
+                        <CheckCircle2 className="w-3 h-3 shrink-0" /> Verified Account
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <button
+                    id="mobile-dropdown-settings-btn"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileProfileMenu(false);
+                      setShowSettingsModal(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-stone-500/15 flex items-center justify-center shrink-0">
+                      <Sliders className="w-3.5 h-3.5" style={{ color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">Settings & Preferences</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Account, theme, and data
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    id="mobile-dropdown-about-btn"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileProfileMenu(false);
+                      setShowAboutModal(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-stone-500/15 flex items-center justify-center shrink-0">
+                      <Compass className="w-3.5 h-3.5" style={{ color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">About & FAQ</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Sanctuary philosophy & guidance
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    id="mobile-dropdown-legal-btn"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setLegalModalTab('privacy');
+                      setShowMobileProfileMenu(false);
+                      setShowLegalModal(true);
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-stone-500/10"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-stone-500/15 flex items-center justify-center shrink-0">
+                      <Shield className="w-3.5 h-3.5" style={{ color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">Privacy & Terms</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        Your data security & rights
+                      </p>
+                    </div>
+                  </button>
+
+                  <div className="my-1 border-t" style={{ borderColor: 'var(--border-color)' }} />
+
+                  <button
+                    id="mobile-dropdown-signout-btn"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMobileProfileMenu(false);
+                      signOut();
+                    }}
+                    className="w-full text-left p-2 rounded-xl transition flex items-center gap-2.5 cursor-pointer hover:bg-red-500/10 text-red-400"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0">
+                      <LogOut className="w-3.5 h-3.5 text-red-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-red-400">Log Out</p>
+                      <p className="text-[10px] text-red-400/80 truncate">
+                        Sign out of private session
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Desktop User Profile Display (md and above) */}
+            <div
+              className="hidden md:flex items-center gap-2.5 pl-2.5 border-l shrink-0"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              {userProfile?.photoURL ? (
+                <img
+                  src={userProfile.photoURL}
+                  alt={userProfile.displayName || "User"}
+                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 rounded-full object-cover border shrink-0"
+                  style={{ borderColor: 'var(--border-color)' }}
+                />
+              ) : (
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                >
+                  <UserIcon className="w-3.5 h-3.5" />
+                </div>
+              )}
+              <div className="text-left max-w-[120px] lg:w-[130px] shrink-0">
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-semibold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
+                    {userProfile?.displayName || "Reflector"}
+                  </p>
+                  {userProfile?.emailVerified && (
+                    <span title="Verified Account" className="text-emerald-500 shrink-0">
+                      <CheckCircle2 className="w-3 h-3" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Only: Settings Modal Trigger */}
+          <button
+            id="open-settings-modal-btn"
+            type="button"
+            onClick={() => setShowSettingsModal(true)}
+            title="Account Settings & Preferences"
+            className="hidden md:inline-flex p-1.5 rounded-lg border transition cursor-pointer hover:opacity-85 shrink-0"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-primary)'
+            }}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Desktop Only: Logout Button */}
           <button
             id="sign-out-btn"
             onClick={signOut}
             title="Sign out of private session"
-            className="p-1.5 rounded-lg transition-colors cursor-pointer hover:opacity-80"
+            className="hidden md:inline-flex p-1.5 rounded-lg transition-colors cursor-pointer hover:opacity-80 shrink-0"
             style={{ color: 'var(--text-muted)' }}
           >
             <LogOut className="w-4 h-4" />
@@ -788,14 +1258,18 @@ export const Dashboard: React.FC = () => {
 
             <button
               id="new-entry-btn"
+              type="button"
               onClick={startNewEntry}
-              className="text-xs font-medium text-white px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer hover:opacity-90"
+              className="text-xs font-semibold text-white px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer hover:opacity-90 active:scale-95 shrink-0"
               style={{
                 backgroundColor: 'var(--accent)',
                 boxShadow: '0 0 10px var(--accent-glow)'
               }}
+              title="Start a new reflection"
+              aria-label="Start a new reflection"
             >
-              <span>+ New</span>
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>New Reflection</span>
             </button>
           </div>
 
@@ -966,7 +1440,10 @@ export const Dashboard: React.FC = () => {
                 <span>&bull;</span>
                 <button
                   type="button"
-                  onClick={() => setShowLegalModal(true)}
+                  onClick={() => {
+                    setLegalModalTab('privacy');
+                    setShowLegalModal(true);
+                  }}
                   className="hover:underline opacity-80 hover:opacity-100 cursor-pointer"
                 >
                   Privacy & Terms
@@ -986,28 +1463,67 @@ export const Dashboard: React.FC = () => {
         >
           {/* Top Active Bar */}
           <div
-            className="p-3.5 border-b flex flex-wrap items-center justify-between gap-3"
+            className="p-3 sm:p-3.5 border-b flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar"
             style={{
               backgroundColor: 'var(--bg-card-elevated)',
               borderColor: 'var(--border-color)'
             }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-                {activeInteractionId ? "Active Reflection" : "Draft New Reflection"}
+                {activeInteractionId ? "Active Reflection" : "New Reflection"}
               </span>
+
+              {/* Active Reflection contextual badges (Location & Time Capsule) */}
+              {activeInteractionId && (() => {
+                const activeItem = interactions.find(i => i.id === activeInteractionId);
+                if (!activeItem) return null;
+                return (
+                  <div className="hidden sm:flex items-center gap-1.5">
+                    {activeItem.location && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-medium"
+                        style={{
+                          backgroundColor: 'rgba(217, 119, 6, 0.08)',
+                          borderColor: 'rgba(217, 119, 6, 0.3)',
+                          color: '#d97706'
+                        }}
+                        title={`Written at ${activeItem.location.placeName}`}
+                      >
+                        <MapPin className="w-2.5 h-2.5" />
+                        <span className="truncate max-w-[120px]">{activeItem.location.placeName}</span>
+                      </span>
+                    )}
+                    {activeItem.timeCapsule && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-medium"
+                        style={{
+                          backgroundColor: 'rgba(217, 119, 6, 0.08)',
+                          borderColor: 'rgba(217, 119, 6, 0.3)',
+                          color: '#d97706'
+                        }}
+                        title={`Time Capsule: ${activeItem.timeCapsule.isSealed ? 'Sealed until ' + new Date(activeItem.timeCapsule.unlocksAt).toLocaleDateString() : 'Unsealed'}`}
+                      >
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>{activeItem.timeCapsule.isSealed ? 'Capsule Sealed' : 'Capsule Unsealed'}</span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+
               {activeInteractionId && (
-                <button
+                <ResponsiveIconButton
                   id="delete-active-reflection-header-btn"
-                  type="button"
+                  icon={<Trash2 className="w-3 h-3 text-red-400" />}
+                  label="Delete"
+                  description="Delete this reflection permanently"
+                  showText={showModeLabels}
                   onClick={(e) => requestDelete(activeInteractionId, e)}
-                  title="Delete this reflection permanently"
-                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg border text-red-400 hover:text-red-300 hover:bg-red-500/10 transition cursor-pointer"
+                  ariaLabel="Delete this reflection permanently"
+                  className="px-2 py-0.5 rounded-lg border text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition"
                   style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span className="hidden sm:inline">Delete</span>
-                </button>
+                />
               )}
               {statusMessage && (
                 <span
@@ -1023,30 +1539,49 @@ export const Dashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Reflection Modes Selector */}
+            {/* Reflection Modes Selector with dynamic auto-adjusting responsive labels */}
             <div
-              className="flex items-center gap-1 p-1 rounded-xl border"
+              ref={modeBarContainerRef}
+              className="flex items-center gap-1 p-1 rounded-xl border shrink-0"
               style={{
                 backgroundColor: 'var(--bg-canvas)',
                 borderColor: 'var(--border-color)'
               }}
             >
-              {(['reflection', 'brainstorm', 'summary', 'advice'] as ReflectionMode[]).map(m => (
-                <button
-                  key={m}
-                  id={`mode-btn-${m}`}
-                  onClick={() => setMode(m)}
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium capitalize transition cursor-pointer"
-                  style={{
-                    backgroundColor: mode === m ? 'var(--accent)' : 'transparent',
-                    color: mode === m ? '#ffffff' : 'var(--text-muted)',
-                    boxShadow: mode === m ? '0 0 10px var(--accent-glow)' : 'none'
-                  }}
-                >
-                  {getModeIcon(m)}
-                  <span className="capitalize">{m}</span>
-                </button>
-              ))}
+              {(['reflection', 'brainstorm', 'summary', 'advice'] as ReflectionMode[]).map(m => {
+                const labelMap: Record<ReflectionMode, { label: string; desc: string }> = {
+                  reflection: { label: 'Reflection', desc: 'Contemplative inquiry and mindful exploration' },
+                  brainstorm: { label: 'Brainstorm', desc: 'Creative ideas and possibilities' },
+                  summary: { label: 'Summary', desc: 'Distill core essence and main takeaways' },
+                  advice: { label: 'Advice', desc: 'Actionable guidance and next steps' }
+                };
+                const info = labelMap[m];
+                const isSelected = mode === m;
+
+                return (
+                  <ResponsiveIconButton
+                    key={m}
+                    id={`mode-btn-${m}`}
+                    icon={getModeIcon(m)}
+                    label={info.label}
+                    description={info.desc}
+                    showText={showModeLabels}
+                    active={isSelected}
+                    onClick={() => setMode(m)}
+                    ariaLabel={`${info.label} Mode — ${info.desc}`}
+                    className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                    activeStyle={{
+                      backgroundColor: 'var(--accent)',
+                      color: '#ffffff',
+                      boxShadow: '0 0 10px var(--accent-glow)'
+                    }}
+                    inactiveStyle={{
+                      backgroundColor: 'transparent',
+                      color: 'var(--text-muted)'
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -1322,7 +1857,7 @@ export const Dashboard: React.FC = () => {
                     className="flex flex-wrap items-center justify-between pt-2 border-t mt-1 gap-2"
                     style={{ borderColor: 'var(--border-color)' }}
                   >
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div ref={composerActionsContainerRef} className="flex items-center gap-1.5 flex-wrap">
                       {/* Sanctuary Voice Input with live transcription */}
                       <SanctuaryVoiceInput
                         currentValue={prompt}
@@ -1331,40 +1866,65 @@ export const Dashboard: React.FC = () => {
                       />
 
                       {/* Location-Aware Sanctuary Journey Tagger */}
-                      <button
-                        id="tag-location-btn"
-                        type="button"
-                        onClick={() => setShowLocationModal(true)}
-                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85 cursor-pointer"
-                        style={{
-                          backgroundColor: stagedLocation ? 'rgba(217, 119, 6, 0.12)' : 'var(--bg-card-elevated)',
-                          borderColor: stagedLocation ? '#d97706' : 'var(--border-color)',
-                          color: stagedLocation ? '#d97706' : 'var(--text-muted)'
-                        }}
-                        title="Tag a tranquil place where you wrote this reflection"
-                      >
-                        <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                        <span className="max-w-[110px] truncate text-[11px]">
-                          {stagedLocation ? stagedLocation.placeName : 'Tag Place'}
-                        </span>
-                      </button>
+                      <div className="inline-flex items-center">
+                        <ResponsiveIconButton
+                          id="tag-location-btn"
+                          icon={<MapPin className="w-3.5 h-3.5 text-amber-500" />}
+                          label={stagedLocation ? stagedLocation.placeName : 'Tag Place'}
+                          description={stagedLocation ? `Location: ${stagedLocation.placeName}` : 'Tag a tranquil place where you wrote this reflection'}
+                          showText={showComposerActionLabels}
+                          active={!!stagedLocation}
+                          onClick={() => setShowLocationModal(true)}
+                          ariaLabel="Tag a tranquil place where you wrote this reflection"
+                          className={`px-2.5 py-1.5 border text-xs font-medium ${stagedLocation ? 'rounded-l-xl rounded-r-none border-r-0' : 'rounded-xl'}`}
+                          activeStyle={{
+                            backgroundColor: 'rgba(217, 119, 6, 0.12)',
+                            borderColor: '#d97706',
+                            color: '#d97706'
+                          }}
+                          inactiveStyle={{
+                            backgroundColor: 'var(--bg-card-elevated)',
+                            borderColor: 'var(--border-color)',
+                            color: 'var(--text-muted)'
+                          }}
+                        />
+                        {stagedLocation && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStagedLocation(null);
+                            }}
+                            title="Remove tagged place"
+                            aria-label="Remove tagged place"
+                            className="px-1.5 py-1.5 rounded-r-xl border border-l-0 text-xs font-medium cursor-pointer transition hover:opacity-80"
+                            style={{
+                              backgroundColor: 'rgba(217, 119, 6, 0.12)',
+                              borderColor: '#d97706',
+                              color: '#d97706'
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
 
                       {/* Serenity Time Capsule Seal shortcut */}
-                      <button
+                      <ResponsiveIconButton
                         id="capsule-active-btn"
-                        type="button"
+                        icon={<Clock className="w-3.5 h-3.5 text-amber-500" />}
+                        label="Time Capsule"
+                        description="Seal this entry in a Time Capsule to re-read in the future"
+                        showText={showComposerActionLabels}
                         onClick={() => setShowTimeCapsule(true)}
-                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition hover:opacity-85 cursor-pointer"
+                        ariaLabel="Seal this entry in a Time Capsule to re-read in the future"
+                        className="px-2.5 py-1.5 rounded-xl border text-xs font-medium"
                         style={{
                           backgroundColor: 'var(--bg-card-elevated)',
                           borderColor: 'var(--border-color)',
                           color: 'var(--text-muted)'
                         }}
-                        title="Seal this entry in a Time Capsule to re-read in the future"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-amber-500" />
-                        <span className="text-[11px] hidden sm:inline">Time Capsule</span>
-                      </button>
+                      />
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
@@ -1396,7 +1956,14 @@ export const Dashboard: React.FC = () => {
       {/* Polite Email Verification Gate Modal */}
       <AnimatePresence>
         {showVerifyModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowVerifyModal(false);
+              }
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1502,6 +2069,7 @@ export const Dashboard: React.FC = () => {
           setShowAboutModal(true);
         }}
         onOpenLegal={() => {
+          setLegalModalTab('privacy');
           setNavigatedFromSettings(true);
           setShowSettingsModal(false);
           setShowLegalModal(true);
@@ -1544,6 +2112,16 @@ export const Dashboard: React.FC = () => {
           setShowAboutModal(false);
           setNavigatedFromSettings(false);
         }}
+        onOpenPrivacy={() => {
+          setLegalModalTab('privacy');
+          setShowAboutModal(false);
+          setShowLegalModal(true);
+        }}
+        onOpenTerms={() => {
+          setLegalModalTab('terms');
+          setShowAboutModal(false);
+          setShowLegalModal(true);
+        }}
         onBack={navigatedFromSettings ? () => {
           setShowAboutModal(false);
           setNavigatedFromSettings(false);
@@ -1554,6 +2132,7 @@ export const Dashboard: React.FC = () => {
       {/* Privacy Policy & Terms of Service Modal */}
       <LegalModal
         isOpen={showLegalModal}
+        initialTab={legalModalTab}
         onClose={() => {
           setShowLegalModal(false);
           setNavigatedFromSettings(false);
