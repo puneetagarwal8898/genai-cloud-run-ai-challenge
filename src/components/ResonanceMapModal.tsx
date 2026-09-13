@@ -300,7 +300,7 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                           {interaction.summary || interaction.prompt.slice(0, 35)}
                         </p>
                         <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {new Date(interaction.timestamp).toLocaleDateString(undefined, {
+                          {new Date(interaction.timestamp || interaction.createdAt).toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric'
                           })}
@@ -408,7 +408,7 @@ export const ResonanceMapModal: React.FC<ResonanceMapModalProps> = ({
                       color: 'var(--text-secondary)'
                     }}
                   >
-                    {selectedNode.response}
+                    {selectedNode.response || selectedNode.geminiResponse}
                   </p>
                 </div>
 

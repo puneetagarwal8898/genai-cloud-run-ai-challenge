@@ -11,6 +11,7 @@ import { AppProvider } from './context/AppContext';
 import { LandingPage } from './components/LandingPage';
 import { Dashboard } from './components/Dashboard';
 import { CursorWaveEffect } from './components/CursorWaveEffect';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { validateFirestoreConnection } from './firebase';
 
 function MainApp() {
@@ -85,7 +86,9 @@ export default function App() {
     <ThemeProvider>
       <AppProvider>
         <AuthProvider>
-          <MainApp />
+          <ErrorBoundary>
+            <MainApp />
+          </ErrorBoundary>
         </AuthProvider>
       </AppProvider>
     </ThemeProvider>

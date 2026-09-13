@@ -53,8 +53,6 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
     emergentStrengths: string[];
   } | null>(null);
 
-  if (!isOpen) return null;
-
   const interactionList = interactions || allInteractions || [];
 
   // Filter capsules
@@ -169,6 +167,8 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -588,7 +588,7 @@ export const TimeCapsuleModal: React.FC<TimeCapsuleModalProps> = ({
                             {capsule.timeCapsule?.capsulePrompt || 'Opened Capsule'}
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            Opened {new Date(capsule.timestamp).toLocaleDateString()}
+                            Opened {new Date(capsule.timeCapsule?.openedDate || capsule.updatedAt || capsule.createdAt || Date.now()).toLocaleDateString()}
                           </span>
                         </div>
                         <p className="text-xs italic" style={{ color: 'var(--text-secondary)' }}>
